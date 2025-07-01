@@ -151,11 +151,29 @@ https://your-ngrok-url.ngrok.io/webhook
 - **GET** `/test` - Test database connectivity
 - **POST** `/admin/broadcast` - Broadcast jobs to users
 
+## 📱 How to Join the WhatsApp Bot
+
+**🚀 Try the live bot now!**
+
+### **Step 1: Join WhatsApp Sandbox**
+
+Send a WhatsApp message to **+1 415 523 8886** with the text:
+
+```
+join so-breathe
+```
+
+### **Step 2: Start Using the Bot**
+
+Once joined, send **"Hi"** to start interacting with the bot!
+
+### **Live Bot URL:** https://whatsapp-job-alert-bot-kenya.onrender.com
+
 ## 📱 User Flow
 
 1. **User sends "Hi" or "Help"** → Bot shows job category menu
-2. **User selects category (1-10)** → Bot saves interest, shows payment info
-3. **User pays via M-Pesa** → Credits added automatically
+2. **User selects category (fundi, cleaner, tutor, driver, security)** → Bot saves interest, shows payment info
+3. **User pays via M-Pesa** → Credits added automatically (sandbox testing)
 4. **User sends "JOBS"** → Bot sends latest job alerts
 5. **User sends "BALANCE"** → Bot shows current credits
 
