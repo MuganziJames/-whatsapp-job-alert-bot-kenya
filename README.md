@@ -1,5 +1,23 @@
 # 🤖 WhatsApp Job Alert Bot (Kenya MVP)
 
+# **📱 HOW TO JOIN THE WHATSAPP BOT**
+
+## **🚀 Try the live bot now!**
+
+### **Step 1: Join WhatsApp Sandbox**
+
+**Send a WhatsApp message to `+1 415 523 8886` with the text:**
+
+```
+join so-breathe
+```
+
+### **Step 2: Start Using the Bot**
+
+**Once joined, send `"Hi"` to start interacting with the bot!**
+
+---
+
 A comprehensive backend system that sends job alerts via WhatsApp using M-Pesa payments for credits. Built with Flask, Supabase, Twilio, and M-Pesa Daraja API.
 
 ## 🌟 Features
@@ -150,24 +168,6 @@ https://your-ngrok-url.ngrok.io/webhook
 - **GET** `/` - Health check
 - **GET** `/test` - Test database connectivity
 - **POST** `/admin/broadcast` - Broadcast jobs to users
-
-## 📱 How to Join the WhatsApp Bot
-
-**🚀 Try the live bot now!**
-
-### **Step 1: Join WhatsApp Sandbox**
-
-Send a WhatsApp message to **+1 415 523 8886** with the text:
-
-```
-join so-breathe
-```
-
-### **Step 2: Start Using the Bot**
-
-Once joined, send **"Hi"** to start interacting with the bot!
-
-### **Live Bot URL:** https://whatsapp-job-alert-bot-kenya.onrender.com
 
 ## 📱 User Flow
 
