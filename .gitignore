@@ -51,9 +51,11 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Deployment files that should NOT be tracked
+# (runtime.txt should be tracked for Render deployment)
+
 # Deployment
 Procfile
 render.yaml
 gunicorn.conf.py
-runtime.txt
 RENDER_DEPLOYMENT.md 
