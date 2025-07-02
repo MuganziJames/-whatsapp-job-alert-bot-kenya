@@ -23,7 +23,7 @@ A comprehensive backend system that sends job alerts via WhatsApp with a simple 
 ## 🌟 Features
 
 - **WhatsApp Integration**: Receive and send messages via Twilio WhatsApp API
-- **Job Interest Selection**: Users select from 5 job categories (fundi, cleaner, tutor, driver, security)
+- **Job Interest Selection**: Users select from 9 job categories (Data Entry, Sales & Marketing, Delivery & Logistics, Customer Service, Finance & Accounting, Admin & Office Work, Teaching / Training, Internships / Attachments, Software Engineering)
 - **Simple Credit System**: Users choose 1-30 credits instantly via WhatsApp
 - **Job Scraping**: Scrape latest jobs from Kenya job boards
 - **Credit-Based Alerts**: 1 credit = 1 job alert
@@ -172,7 +172,7 @@ https://your-ngrok-url.ngrok.io/webhook
 ## 📱 User Flow
 
 1. **User sends "Hi" or "Help"** → Bot shows job category menu
-2. **User selects category (fundi, cleaner, tutor, driver, security)** → Bot saves interest, shows credit options
+2. **User selects category (Data Entry, Sales & Marketing, etc.)** → Bot saves interest, shows credit options
 3. **User sends number (1-30)** → Credits added instantly to account
 4. **User sends "JOBS"** → Bot sends latest job alerts
 5. **User sends "BALANCE"** → Bot shows current credits
@@ -187,16 +187,15 @@ https://your-ngrok-url.ngrok.io/webhook
 
 ## 🎯 Job Categories
 
-1. Fundi (Technician/Handyman)
-2. Cleaner/Housekeeping
-3. Tutor/Teacher
-4. Driver
-5. Security Guard
-6. Cook/Chef
-7. Nanny/Childcare
-8. Mechanic
-9. Electrician
-10. Nurse/Healthcare
+1. **Data Entry** - Data input and processing jobs
+2. **Sales & Marketing** - Sales, marketing, and business development
+3. **Delivery & Logistics** - Delivery, transport, and logistics roles
+4. **Customer Service** - Customer support and service positions
+5. **Finance & Accounting** - Financial, accounting, and bookkeeping jobs
+6. **Admin & Office Work** - Administrative and office support roles
+7. **Teaching / Training** - Education, training, and tutoring positions
+8. **Internships / Attachments** - Internship and attachment opportunities
+9. **Software Engineering** - Programming, development, and tech roles
 
 ## 🔍 Job Sources
 

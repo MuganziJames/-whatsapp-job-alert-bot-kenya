@@ -23,6 +23,81 @@ twilio_client = Client(
     os.getenv('TWILIO_TOKEN')
 )
 
+# Valid job categories - centralized list
+VALID_JOB_CATEGORIES = [
+    'data entry',
+    'sales & marketing', 
+    'delivery & logistics',
+    'customer service',
+    'finance & accounting',
+    'admin & office work',
+    'teaching / training',
+    'internships / attachments',
+    'software engineering'
+]
+
+def get_categories_menu() -> str:
+    """Get formatted categories menu for welcome message"""
+    return """🔍 *Welcome to Kenya Job Alert Bot!*
+
+Please reply with your job interest:
+• *Data Entry* - Data input and processing jobs
+• *Sales & Marketing* - Sales, marketing, and business development
+• *Delivery & Logistics* - Delivery, transport, and logistics roles
+• *Customer Service* - Customer support and service positions
+• *Finance & Accounting* - Financial, accounting, and bookkeeping jobs
+• *Admin & Office Work* - Administrative and office support roles
+• *Teaching / Training* - Education, training, and tutoring positions
+• *Internships / Attachments* - Internship and attachment opportunities
+• *Software Engineering* - Programming, development, and tech roles
+
+What type of work are you looking for?"""
+
+def normalize_category(user_input: str) -> str:
+    """Normalize user input to match valid categories"""
+    user_input = user_input.strip().lower()
+    
+    # Direct matches
+    if user_input in VALID_JOB_CATEGORIES:
+        return user_input
+    
+    # Handle variations and shortcuts
+    category_mappings = {
+        'data': 'data entry',
+        'entry': 'data entry',
+        'sales': 'sales & marketing',
+        'marketing': 'sales & marketing',
+        'delivery': 'delivery & logistics',
+        'logistics': 'delivery & logistics',
+        'transport': 'delivery & logistics',
+        'customer': 'customer service',
+        'service': 'customer service',
+        'support': 'customer service',
+        'finance': 'finance & accounting',
+        'accounting': 'finance & accounting',
+        'admin': 'admin & office work',
+        'office': 'admin & office work',
+        'teaching': 'teaching / training',
+        'training': 'teaching / training',
+        'tutor': 'teaching / training',
+        'teacher': 'teaching / training',
+        'internship': 'internships / attachments',
+        'attachment': 'internships / attachments',
+        'intern': 'internships / attachments',
+        'software': 'software engineering',
+        'engineering': 'software engineering',
+        'programming': 'software engineering',
+        'developer': 'software engineering',
+        'tech': 'software engineering',
+        'it': 'software engineering'
+    }
+    
+    return category_mappings.get(user_input, None)
+
+def is_valid_category(user_input: str) -> bool:
+    """Check if user input is a valid job category"""
+    return normalize_category(user_input) is not None
+
 def send_whatsapp_message(to_number: str, message: str) -> bool:
     """Send WhatsApp message via Twilio"""
     try:
@@ -63,6 +138,11 @@ def normalize_phone(phone: str) -> str:
     
     return phone
 
+def has_job_been_sent(phone: str, job_id: str) -> bool:
+    """Helper function to check if job has already been sent to user"""
+    from db import db
+    return db.was_job_sent(phone, job_id)
+
 def process_whatsapp_message(from_number: str, message_body: str) -> str:
     """Process incoming WhatsApp message and return response"""
     try:
@@ -79,33 +159,41 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         
         # Handle "hi" greeting
         if message in ['hi', 'hello', 'start', 'help']:
-            return """🔍 *Welcome to Kenya Job Alert Bot!*
-
-Please reply with your job interest:
-• *fundi* - Handyman/Technician work
-• *cleaner* - Cleaning jobs
-• *tutor* - Teaching/tutoring jobs
-• *driver* - Driving jobs
-• *security* - Security guard jobs
-
-What type of work are you looking for?"""
+            return get_categories_menu()
         
         # Handle job interests
-        job_interests = ['fundi', 'cleaner', 'tutor', 'driver', 'security']
-        
-        if message in job_interests:
+        if is_valid_category(message):
+            # Normalize the category
+            normalized_category = normalize_category(message)
+            
             # Save user interest
             if user:
                 # Update existing user
-                updated_user = db.add_or_update_user(phone, interest=message)
-                if user['interest'] == message:
-                    return f"✅ You already have *{message}* jobs set as your interest.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
+                updated_user = db.add_or_update_user(phone, interest=normalized_category)
+                # Get fresh user data to check current balance
+                fresh_user = db.get_user_by_phone(phone)
+                current_balance = fresh_user.get('balance', 0) if fresh_user else 0
+                
+                if user.get('interest') == normalized_category:
+                    if current_balance > 0:
+                        return f"✅ You already have *{normalized_category.title()}* jobs set as your interest.\n\n💳 Current Balance: *{current_balance}* credits\n\nSend *jobs* to get job alerts!"
+                    else:
+                        return f"✅ You already have *{normalized_category.title()}* jobs set as your interest.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
                 else:
-                    return f"✅ Interest updated to *{message}* jobs!\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *10* to get 10 credits"
+                    if current_balance > 0:
+                        return f"✅ Interest updated to *{normalized_category.title()}* jobs!\n\n💳 Current Balance: *{current_balance}* credits\n\nSend *jobs* to get job alerts!"
+                    else:
+                        return f"✅ Interest updated to *{normalized_category.title()}* jobs!\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *10* to get 10 credits"
             else:
-                # Create new user
-                new_user = db.add_or_update_user(phone, interest=message, balance=0)
-                return f"✅ Great! You're now registered for *{message}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
+                # Create new user (always needs credits)
+                new_user = db.add_or_update_user(phone, interest=normalized_category, balance=0)
+                return f"✅ Great! You're now registered for *{normalized_category.title()}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
+        
+        # Check if user is trying to select a category but it's invalid
+        # This should come after valid category check but before credit selection
+        if not message.isdigit() and not message in ['balance', 'credits', 'account', 'jobs', 'job', 'work', 'refresh', 'new', 'reset']:
+            # User might be trying to select an invalid category
+            return f"❌ Sorry, I don't recognize that job category.\n\n{get_categories_menu()}"
         
         # Handle credit selection (1-30)
         if message.isdigit():
@@ -135,6 +223,15 @@ What type of work are you looking for?"""
             else:
                 return "❌ You're not registered yet. Send *hi* to get started!"
         
+        # Handle refresh command to clear old job records
+        if message in ['refresh', 'new', 'reset']:
+            if not user:
+                return "❌ Please register first by sending *hi*"
+            
+            # Clear old job records
+            db.clear_old_job_records(phone, days_old=0)  # Clear all records
+            return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\nSend *jobs* to get fresh job alerts."
+        
         # Handle job request
         if message in ['jobs', 'job', 'work']:
             if not user:
@@ -147,28 +244,35 @@ What type of work are you looking for?"""
                 return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
             
             # Get and send job
-            from scraper import scrape_jobs
+            from working_scraper import scrape_jobs_working as scrape_jobs
             jobs = scrape_jobs(user['interest'])
             
             if not jobs:
                 return f"😔 No new *{user['interest']}* jobs available right now. We'll keep looking!"
             
-            # Send first available job
-            job = jobs[0]
+            # Find first job that hasn't been sent
+            job_to_send = None
+            for job in jobs:
+                if not has_job_been_sent(phone, job['id']):
+                    job_to_send = job
+                    break
             
-            # Check if already sent
-            if db.was_job_sent(phone, job['id']):
-                return f"✅ You're up to date! No new *{user['interest']}* jobs since last check."
+            # Check if we found a new job
+            if not job_to_send:
+                return f"🔍 All current *{user['interest']}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send *hi*)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
             
             # Deduct credit and send job
             if db.deduct_credit(phone):
-                db.log_job_sent(phone, job['id'], job['title'], job['link'])
+                # Log the job as sent
+                db.log_job_sent(phone, job_to_send['id'], job_to_send['title'], job_to_send['link'])
                 
                 job_message = f"""🎯 *New {user['interest'].title()} Job Alert:*
 
-📋 *{job['title']}*
-🔗 {job['link']}
-�� Location: {job.get('location', 'Kenya')}
+📋 *{job_to_send['title']}*
+🏢 Company: {job_to_send.get('company', 'Not specified')}
+📍 Location: {job_to_send.get('location', 'Kenya')}
+🔗 {job_to_send['link']}
+🌐 Source: {job_to_send.get('source', 'Job Board')}
 
 💰 Credit used: 1
 💳 Remaining: {user['balance'] - 1}
@@ -185,6 +289,7 @@ Good luck! 🍀"""
 • Send *hi* to get started
 • Send *jobs* to get job alerts
 • Send *balance* to check credits
+• Send *refresh* to reset job history
 • Send *1-30* to add credits
 
 Try one of these commands!"""

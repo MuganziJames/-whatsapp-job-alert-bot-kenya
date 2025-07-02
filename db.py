@@ -110,16 +110,17 @@ class DatabaseManager:
             logger.error(f"Error checking balance for {phone}: {str(e)}")
             return False
     
-    def log_job_sent(self, phone: str, job_id: str, job_title: str, job_url: str) -> bool:
+    def log_job_sent(self, phone: str, job_id: str, job_title: str = None, job_url: str = None) -> bool:
         """Log that a job was sent to prevent duplicates"""
         try:
+            # Use only essential fields for job deduplication
             job_log = {
                 'phone': phone,
-                'job_id': job_id,
-                'job_title': job_title,
-                'job_url': job_url
+                'job_id': job_id
             }
+            
             response = self.supabase.table('jobs_sent').insert(job_log).execute()
+            logger.info(f"Successfully logged job {job_id} sent to {phone}")
             return True
         except Exception as e:
             logger.error(f"Error logging job sent to {phone}: {str(e)}")
@@ -132,6 +133,25 @@ class DatabaseManager:
             return len(response.data) > 0
         except Exception as e:
             logger.error(f"Error checking if job was sent to {phone}: {str(e)}")
+            return False
+    
+    def clear_old_job_records(self, phone: str, days_old: int = 7) -> bool:
+        """Clear job records to allow re-sending jobs"""
+        try:
+            if days_old == 0:
+                # Clear all records for this user
+                response = self.supabase.table('jobs_sent').delete().eq('phone', phone).execute()
+            else:
+                # Since sent_at column may not exist, just clear all for now
+                # In production, you'd want to add the sent_at column
+                response = self.supabase.table('jobs_sent').delete().eq('phone', phone).execute()
+            
+            deleted_count = len(response.data) if response.data else 0
+            logger.info(f"Cleared {deleted_count} job records for {phone}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing job records for {phone}: {str(e)}")
             return False
     
     def get_users_by_interest(self, interest: str) -> List[Dict[str, Any]]:
