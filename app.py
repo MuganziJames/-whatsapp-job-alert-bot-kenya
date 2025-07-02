@@ -1,6 +1,6 @@
 """
 Main Flask application for WhatsApp Job Alert Bot
-Handles webhooks for WhatsApp and M-Pesa payments
+Handles webhooks for WhatsApp messages (M-Pesa removed)
 """
 
 from flask import Flask, request, jsonify, Response
@@ -8,7 +8,6 @@ import os
 from dotenv import load_dotenv
 import logging
 from bot import process_whatsapp_message, send_whatsapp_message
-from mpesa import validate_payment, process_confirmation
 from scheduler import start_job_scheduler, run_job_alerts_once
 
 # Load environment variables
@@ -30,7 +29,7 @@ def home():
     return jsonify({
         'status': 'active',
         'service': 'WhatsApp Job Alert Bot',
-        'version': '1.0.0'
+        'version': '2.0.0 - Credit Selection System'
     })
 
 @app.route('/whatsapp', methods=['POST'])
@@ -57,48 +56,6 @@ def whatsapp_webhook():
         logger.error(f"Error processing WhatsApp webhook: {str(e)}")
         return Response('', status=200, mimetype='text/plain')
 
-@app.route('/c2b/validate', methods=['POST'])
-def mpesa_validation():
-    """M-Pesa C2B payment validation endpoint - always return 0"""
-    try:
-        # Get payment data
-        data = request.get_json()
-        logger.info(f"M-Pesa validation request: {data}")
-        
-        # Always validate (return ResultCode: 0)
-        response = validate_payment(data)
-        
-        logger.info(f"Validation response: {response}")
-        return jsonify(response)
-        
-    except Exception as e:
-        logger.error(f"Error in M-Pesa validation: {str(e)}")
-        return jsonify({
-            "ResultCode": "0",
-            "ResultDesc": "Accepted"
-        })
-
-@app.route('/c2b/confirm', methods=['POST'])
-def mpesa_confirmation():
-    """M-Pesa C2B payment confirmation endpoint"""
-    try:
-        # Get payment confirmation data
-        data = request.get_json()
-        logger.info(f"M-Pesa confirmation request: {data}")
-        
-        # Process the payment confirmation
-        response = process_confirmation(data)
-        
-        logger.info(f"Confirmation response: {response}")
-        return jsonify(response)
-        
-    except Exception as e:
-        logger.error(f"Error in M-Pesa confirmation: {str(e)}")
-        return jsonify({
-            "ResultCode": "1",
-            "ResultDesc": "Processing error"
-        })
-
 @app.route('/test', methods=['GET'])
 def test_endpoint():
     """Test endpoint for debugging"""
@@ -113,7 +70,7 @@ def test_endpoint():
             'status': 'ok',
             'database': 'connected',
             'test_user': user,
-            'mpesa_env': mpesa.environment
+            'system': 'Credit Selection System (M-Pesa Removed)'
         })
         
     except Exception as e:

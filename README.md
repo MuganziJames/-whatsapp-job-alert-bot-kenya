@@ -18,15 +18,15 @@ join so-breathe
 
 ---
 
-A comprehensive backend system that sends job alerts via WhatsApp using M-Pesa payments for credits. Built with Flask, Supabase, Twilio, and M-Pesa Daraja API.
+A comprehensive backend system that sends job alerts via WhatsApp with a simple credit selection system. Built with Flask, Supabase, and Twilio WhatsApp API.
 
 ## 🌟 Features
 
 - **WhatsApp Integration**: Receive and send messages via Twilio WhatsApp API
-- **Job Interest Selection**: Users select from 10 job categories (fundi, cleaner, tutor, etc.)
-- **M-Pesa Payments**: Accept C2B payments via Paybill for job alert credits
+- **Job Interest Selection**: Users select from 5 job categories (fundi, cleaner, tutor, driver, security)
+- **Simple Credit System**: Users choose 1-30 credits instantly via WhatsApp
 - **Job Scraping**: Scrape latest jobs from Kenya job boards
-- **Credit System**: 1 KES = 1 job alert credit
+- **Credit-Based Alerts**: 1 credit = 1 job alert
 - **Duplicate Prevention**: Track sent jobs to avoid spam
 - **Admin Broadcast**: Send jobs to all users with specific interests
 
@@ -172,18 +172,18 @@ https://your-ngrok-url.ngrok.io/webhook
 ## 📱 User Flow
 
 1. **User sends "Hi" or "Help"** → Bot shows job category menu
-2. **User selects category (fundi, cleaner, tutor, driver, security)** → Bot saves interest, shows payment info
-3. **User pays via M-Pesa** → Credits added automatically (sandbox testing)
+2. **User selects category (fundi, cleaner, tutor, driver, security)** → Bot saves interest, shows credit options
+3. **User sends number (1-30)** → Credits added instantly to account
 4. **User sends "JOBS"** → Bot sends latest job alerts
 5. **User sends "BALANCE"** → Bot shows current credits
 
-## 💳 M-Pesa Payment Flow
+## 💳 Credit Selection System
 
-1. User sends money to Paybill: **600000**
-2. Account number: **User's phone number**
-3. M-Pesa sends validation request to `/c2b/validate`
-4. M-Pesa sends confirmation to `/c2b/confirm`
-5. Bot adds credits and sends confirmation message
+1. User selects job interest (fundi, cleaner, tutor, driver, security)
+2. User sends a number from **1 to 30** to get that many credits
+3. Credits are added instantly to their account
+4. User can send **"jobs"** to receive job alerts (1 credit per alert)
+5. User can check balance anytime with **"balance"**
 
 ## 🎯 Job Categories
 

@@ -99,18 +99,39 @@ What type of work are you looking for?"""
                 # Update existing user
                 updated_user = db.add_or_update_user(phone, interest=message)
                 if user['interest'] == message:
-                    return f"✅ You already have *{message}* jobs set as your interest.\n\n💰 *To get job alerts:*\nPay to Paybill: *600000*\nAccount: *{phone}*\n1 KES = 1 job alert"
+                    return f"✅ You already have *{message}* jobs set as your interest.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
                 else:
-                    return f"✅ Interest updated to *{message}* jobs!\n\n💰 *To get job alerts:*\nPay to Paybill: *600000*\nAccount: *{phone}*\n1 KES = 1 job alert"
+                    return f"✅ Interest updated to *{message}* jobs!\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *10* to get 10 credits"
             else:
                 # Create new user
                 new_user = db.add_or_update_user(phone, interest=message, balance=0)
-                return f"✅ Great! You're now registered for *{message}* job alerts.\n\n💰 *To receive alerts:*\nPay to Paybill: *600000*\nAccount: *{phone}*\n1 KES = 1 job alert"
+                return f"✅ Great! You're now registered for *{message}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
+        
+        # Handle credit selection (1-30)
+        if message.isdigit():
+            credit_amount = int(message)
+            if 1 <= credit_amount <= 30:
+                if not user:
+                    return "❌ Please register first by sending *hi* and selecting your job interest."
+                
+                if not user.get('interest'):
+                    return "❌ Please set your job interest first. Send *hi* to see options."
+                
+                # Add credits to user account
+                success = db.add_balance(phone, credit_amount)
+                
+                if success:
+                    new_balance = user['balance'] + credit_amount
+                    return f"✅ *Credits Added Successfully!*\n\n💰 Added: *{credit_amount}* credits\n💳 Total Balance: *{new_balance}* credits\n🎯 Job Interest: *{user['interest']}*\n\nSend *jobs* to start receiving job alerts!"
+                else:
+                    return "❌ Error adding credits. Please try again."
+            else:
+                return "❌ Please send a number between *1 and 30* to select your credits.\n\nExample: Send *5* to get 5 credits"
         
         # Handle balance check
         if message in ['balance', 'credits', 'account']:
             if user:
-                return f"💳 *Account Balance:*\nCredits: *{user['balance']}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nPay to Paybill *600000* to add credits!"
+                return f"💳 *Account Balance:*\nCredits: *{user['balance']}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend a number (1-30) to add more credits!"
             else:
                 return "❌ You're not registered yet. Send *hi* to get started!"
         
@@ -123,7 +144,7 @@ What type of work are you looking for?"""
                 return "❌ Please set your job interest first. Send *hi* to see options."
             
             if user['balance'] <= 0:
-                return f"❌ No credits available!\n\n💰 *Add credits:*\nPay to Paybill: *600000*\nAccount: *{phone}*\n1 KES = 1 job alert"
+                return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
             
             # Get and send job
             from scraper import scrape_jobs
@@ -147,7 +168,7 @@ What type of work are you looking for?"""
 
 📋 *{job['title']}*
 🔗 {job['link']}
-📍 Location: {job.get('location', 'Kenya')}
+�� Location: {job.get('location', 'Kenya')}
 
 💰 Credit used: 1
 💳 Remaining: {user['balance'] - 1}
@@ -164,6 +185,7 @@ Good luck! 🍀"""
 • Send *hi* to get started
 • Send *jobs* to get job alerts
 • Send *balance* to check credits
+• Send *1-30* to add credits
 
 Try one of these commands!"""
         
