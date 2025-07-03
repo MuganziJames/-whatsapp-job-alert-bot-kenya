@@ -37,24 +37,35 @@ def home():
 def whatsapp_webhook():
     """Handle incoming WhatsApp messages from Twilio"""
     try:
-        # Get message data from Twilio
+        # Get message data from Twilio webhook (form data)
         from_number = request.form.get('From', '')
         message_body = request.form.get('Body', '')
         
-        logger.info(f"Received WhatsApp message from {from_number}: {message_body}")
+        logger.info(f"📱 Received WhatsApp message from {from_number}: {message_body}")
+        
+        if not from_number or not message_body:
+            logger.warning("Invalid webhook data - missing From or Body")
+            return Response('', status=200, mimetype='text/plain')
         
         # Process the message and get response
         response_message = process_whatsapp_message(from_number, message_body)
         
+        logger.info(f"💬 Generated response: {response_message}")
+        
         # Send the response back to the user via Twilio
         if response_message:
+            logger.info(f"📤 Sending response to {from_number}")
             send_whatsapp_message(from_number, response_message)
+        else:
+            logger.warning("No response message generated")
         
         # Return empty 200 response to Twilio webhook
         return Response('', status=200, mimetype='text/plain')
         
     except Exception as e:
-        logger.error(f"Error processing WhatsApp webhook: {str(e)}")
+        logger.error(f"❌ Error processing WhatsApp webhook: {str(e)}")
+        import traceback
+        logger.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return Response('', status=200, mimetype='text/plain')
 
 @app.route('/test', methods=['GET'])

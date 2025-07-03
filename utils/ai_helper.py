@@ -11,6 +11,10 @@ from dotenv import load_dotenv
 import hashlib
 import json
 import re
+import time
+import threading
+from queue import Queue
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -18,6 +22,37 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Rate limiting and queuing
+REQUEST_QUEUE = Queue()
+LAST_REQUEST_TIME = 0
+MIN_REQUEST_INTERVAL = 2.0  # 2 seconds between requests
+MAX_REQUESTS_PER_MINUTE = 20  # Conservative limit
+request_times = []
+request_lock = threading.Lock()
+
+# Simple cache for AI responses
+AI_CACHE = {}
+CACHE_EXPIRY_MINUTES = 30
+cache_lock = threading.Lock()
+
+# Usage monitoring
+daily_usage = {"date": "", "requests": 0, "cache_hits": 0}
+usage_lock = threading.Lock()
+
+def log_usage_stats():
+    """Log daily usage statistics"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with usage_lock:
+        if daily_usage["date"] != today:
+            if daily_usage["date"]:  # Not first run
+                logger.info(f"📊 Daily AI Usage Summary for {daily_usage['date']}: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits")
+            daily_usage["date"] = today
+            daily_usage["requests"] = 0
+            daily_usage["cache_hits"] = 0
+        
+        daily_usage["requests"] += 1
+        logger.info(f"📈 Today's AI usage: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits")
 
 # Initialize OpenRouter client for free DeepSeek access
 AI_AVAILABLE = False
@@ -50,9 +85,115 @@ JOB_CATEGORIES = {
     'software engineering': 'Programming, development, and tech roles'
 }
 
+def can_make_request() -> bool:
+    """Check if we can make a request without hitting rate limits"""
+    global request_times
+    now = time.time()
+    
+    with request_lock:
+        # Remove requests older than 1 minute
+        request_times = [t for t in request_times if now - t < 60]
+        
+        # Check if we're under the per-minute limit
+        if len(request_times) >= MAX_REQUESTS_PER_MINUTE:
+            return False
+        
+        # Check minimum interval since last request
+        global LAST_REQUEST_TIME
+        if now - LAST_REQUEST_TIME < MIN_REQUEST_INTERVAL:
+            return False
+    
+    return True
+
+def wait_for_rate_limit():
+    """Wait until we can make a request"""
+    global LAST_REQUEST_TIME
+    
+    while not can_make_request():
+        time.sleep(0.5)  # Check every 500ms
+    
+    # Record this request
+    now = time.time()
+    with request_lock:
+        request_times.append(now)
+        LAST_REQUEST_TIME = now
+
+def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 3) -> Any:
+    """Make AI request with intelligent retry and rate limiting"""
+    if not AI_AVAILABLE or not client:
+        return None
+    
+    # Wait for rate limit clearance
+    wait_for_rate_limit()
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"Making AI request (attempt {attempt + 1}/{max_retries})")
+            
+            response = client.chat.completions.create(
+                model="deepseek/deepseek-r1:free",
+                messages=messages,
+                max_tokens=1000,
+                temperature=0.7
+            )
+            
+            logger.info("✅ AI request successful")
+            return response
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.warning(f"AI request attempt {attempt + 1} failed: {error_msg}")
+            
+            if "429" in error_msg or "rate limit" in error_msg.lower():
+                # Exponential backoff for rate limiting
+                wait_time = (2 ** attempt) * 2  # 2, 4, 8 seconds
+                logger.info(f"Rate limited, waiting {wait_time} seconds before retry...")
+                time.sleep(wait_time)
+                continue
+            elif attempt == max_retries - 1:
+                # Last attempt failed
+                raise e
+            else:
+                # Other error, short wait and retry
+                time.sleep(1)
+                continue
+    
+    return None
+
+def get_cache_key(prompt: str, context: Dict[str, Any] = None) -> str:
+    """Generate cache key for AI requests"""
+    context_str = json.dumps(context, sort_keys=True) if context else ""
+    return hashlib.md5(f"{prompt}{context_str}".encode()).hexdigest()
+
+def get_cached_response(cache_key: str) -> Optional[Dict[str, str]]:
+    """Get cached AI response if available and not expired"""
+    with cache_lock:
+        if cache_key in AI_CACHE:
+            cached_item = AI_CACHE[cache_key]
+            # Check if cache is still valid (30 minutes)
+            if time.time() - cached_item['timestamp'] < CACHE_EXPIRY_MINUTES * 60:
+                logger.info("✅ Using cached AI response")
+                return cached_item['response']
+            else:
+                # Remove expired cache
+                del AI_CACHE[cache_key]
+    return None
+
+def cache_response(cache_key: str, response: Dict[str, str]):
+    """Cache AI response"""
+    with cache_lock:
+        AI_CACHE[cache_key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
+        # Clean up old cache entries (keep only last 100)
+        if len(AI_CACHE) > 100:
+            oldest_key = min(AI_CACHE.keys(), key=lambda k: AI_CACHE[k]['timestamp'])
+            del AI_CACHE[oldest_key]
+
 def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
     """
-    Ask DeepSeek Reasoner AI with enhanced context
+    Ask DeepSeek Reasoner AI with enhanced context, caching, and rate limiting
     
     Args:
         prompt: User's question or request
@@ -66,6 +207,17 @@ def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
             "reasoning": "",
             "content": "AI assistant is currently unavailable. Please try again later or contact support."
         }
+    
+    # Check cache first
+    cache_key = get_cache_key(prompt, context)
+    cached_response = get_cached_response(cache_key)
+    if cached_response:
+        with usage_lock:
+            daily_usage["cache_hits"] += 1
+        return cached_response
+    
+    # Log usage
+    log_usage_stats()
     
     try:
         # Build enhanced prompt with context
@@ -82,12 +234,14 @@ def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
             }
         ]
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=messages,
-            max_tokens=1000,
-            temperature=0.7
-        )
+        # Use the new rate-limited request function
+        response = make_ai_request_with_retry(messages)
+        
+        if not response:
+            return {
+                "reasoning": "",
+                "content": "I'm temporarily busy processing other requests. Please try again in a moment!"
+            }
         
         reasoning = getattr(response.choices[0].message, 'reasoning_content', '')
         content = response.choices[0].message.content
@@ -95,17 +249,31 @@ def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
         # Log the interaction for analytics
         logger.info(f"AI Query: {prompt[:50]}... | Response: {content[:50]}...")
         
-        return {
+        response_dict = {
             "reasoning": reasoning or "",
             "content": content or "I'm sorry, I couldn't generate a response. Please try again."
         }
         
+        # Cache the response
+        cache_response(cache_key, response_dict)
+        
+        return response_dict
+        
     except Exception as e:
-        logger.error(f"Error with DeepSeek API: {str(e)}")
-        return {
-            "reasoning": "",
-            "content": "I'm having trouble connecting to my AI assistant right now. Please try again later, or feel free to ask me about our job categories!"
-        }
+        error_msg = str(e)
+        logger.error(f"Error with DeepSeek API: {error_msg}")
+        
+        # Handle rate limiting specifically
+        if "429" in error_msg or "rate limit" in error_msg.lower():
+            return {
+                "reasoning": "",
+                "content": "🤖 I'm currently at my daily AI limit, but I can still help! Try asking about our job categories:\n\n• *Data Entry* - Data processing jobs\n• *Sales & Marketing* - Business development roles\n• *Software Engineering* - Programming and tech jobs\n• *Customer Service* - Support and service roles\n\nOr send the name of any category to get started!"
+            }
+        else:
+            return {
+                "reasoning": "",
+                "content": "I'm having trouble connecting to my AI assistant right now. Please try again later, or feel free to ask me about our job categories!"
+            }
 
 def get_system_prompt() -> str:
     """Get the system prompt for DeepSeek"""
@@ -179,12 +347,11 @@ Examples:
 - "Hello" → "none"
 """
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=50,
-            temperature=0.1
-        )
+        messages = [{"role": "user", "content": prompt}]
+        response = make_ai_request_with_retry(messages)
+        
+        if not response:
+            return None
         
         result = response.choices[0].message.content.strip().lower()
         
@@ -228,12 +395,15 @@ Provide:
 
 Format your response as a helpful WhatsApp message."""
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.7
-        )
+        messages = [{"role": "user", "content": prompt}]
+        response = make_ai_request_with_retry(messages)
+        
+        if not response:
+            return {
+                "category": None,
+                "explanation": "I'm temporarily busy processing other requests. Please try again in a moment, or feel free to browse our job categories!",
+                "confidence": "low"
+            }
         
         content = response.choices[0].message.content
         

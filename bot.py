@@ -6,8 +6,6 @@ Handles user interactions for Kenya Job Alert Bot
 
 import os
 import logging
-from twilio.rest import Client
-from twilio.twiml.messaging_response import MessagingResponse
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -19,10 +17,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Twilio client
-twilio_client = Client(
-    os.getenv('TWILIO_SID'),
-    os.getenv('TWILIO_TOKEN')
-)
+try:
+    from twilio.rest import Client
+    from twilio.base.exceptions import TwilioException
+    
+    twilio_client = Client(os.getenv('TWILIO_SID'), os.getenv('TWILIO_TOKEN'))
+    TWILIO_WHATSAPP_NUMBER = os.getenv('TWILIO_WHATSAPP_NUMBER')
+    logger.info("📱 Twilio client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Twilio client: {e}")
+    twilio_client = None
 
 # Valid job categories - centralized list
 VALID_JOB_CATEGORIES = [
@@ -76,7 +80,12 @@ Please reply with your job interest:
 • *Internships / Attachments* - Internship and attachment opportunities
 • *Software Engineering* - Programming, development, and tech roles
 
-What type of work are you looking for?"""
+What type of work are you looking for?
+
+🤖 *New!* I can also help answer your career questions! Try asking:
+• 'What does a [job title] do?'
+• 'Help me choose a job category'
+• 'What skills do I need for [career]?'"""
 
 def normalize_category(user_input: str) -> str:
     """Normalize user input to match valid categories"""
@@ -126,22 +135,32 @@ def is_valid_category(user_input: str) -> bool:
 def send_whatsapp_message(to_number: str, message: str) -> bool:
     """Send WhatsApp message via Twilio"""
     try:
-        # Ensure proper WhatsApp format
+        if not twilio_client:
+            logger.error("Twilio client not initialized")
+            return False
+        
+        # Ensure phone number has whatsapp: prefix
         if not to_number.startswith('whatsapp:'):
             to_number = f'whatsapp:{to_number}'
         
-        message_instance = twilio_client.messages.create(
+        # Send message via Twilio API
+        message_obj = twilio_client.messages.create(
             body=message,
-            from_=os.getenv('TWILIO_WHATSAPP_NUMBER'),
+            from_=TWILIO_WHATSAPP_NUMBER,
             to=to_number
         )
         
-        logger.info(f"WhatsApp message sent to {to_number}: {message_instance.sid}")
+        logger.info(f"WhatsApp message sent to {to_number}: {message_obj.sid}")
         return True
         
+    except TwilioException as e:
+        logger.error(f"Twilio API error: {str(e)}")
+        return False
     except Exception as e:
         logger.error(f"Error sending WhatsApp message to {to_number}: {str(e)}")
         return False
+
+
 
 def normalize_phone(phone: str) -> str:
     """Normalize phone number"""
@@ -163,6 +182,12 @@ def normalize_phone(phone: str) -> str:
     
     return phone
 
+def is_career_question_check(message: str) -> bool:
+    """Check if message is a career question (wrapper for AI function)"""
+    if AI_AVAILABLE:
+        return is_career_question(message)
+    return False
+
 def has_job_been_sent(phone: str, job_id: str) -> bool:
     """Helper function to check if job has already been sent to user"""
     from db import db
@@ -183,7 +208,7 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         # Check if user exists
         user = db.get_user_by_phone(phone)
         
-        # AI-powered career question detection
+        # AI-powered career question detection (with rate limiting protection)
         if AI_AVAILABLE and is_career_question(message):
             logger.info(f"🤖 AI detected career question: {message}")
             
@@ -193,11 +218,11 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
                 'available_categories': VALID_JOB_CATEGORIES
             }
             
-            # Get AI response
+            # Get AI response with fallback handling
             ai_response = ask_deepseek(message, user_context)
             
-            # Check if AI suggests a job category
-            if AI_AVAILABLE:
+            # Check if AI suggests a job category (only if not rate limited)
+            if AI_AVAILABLE and "daily AI limit" not in ai_response["content"]:
                 suggested_interest = extract_job_interest(message)
                 if suggested_interest:
                     # Add category suggestion to response
@@ -226,13 +251,13 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         # Handle "hi" greeting with AI enhancement
         if message_lower in ['hi', 'hello', 'start', 'help']:
             base_menu = get_categories_menu()
-            
+        
             if AI_AVAILABLE and user and user.get('interest'):
                 # Personalized greeting for returning users
                 return f"👋 Welcome back! You're currently interested in *{user['interest'].title()}* jobs.\n\n{base_menu}\n\n💡 *Tip:* You can also ask me questions like 'What does a data analyst do?' or 'Help me choose a career path!'"
             else:
-                # Enhanced greeting for new users
-                return f"{base_menu}\n\n🤖 *New!* I can also help answer your career questions! Try asking:\n• 'What does a [job title] do?'\n• 'Help me choose a job category'\n• 'What skills do I need for [career]?'"
+                # Enhanced greeting for new users (menu already includes AI help text)
+                return base_menu
         
         # Handle job interests with AI validation
         if is_valid_category(message_lower):
