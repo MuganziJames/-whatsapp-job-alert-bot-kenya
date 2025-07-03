@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: whatsapp-job-alert-bot-kenya
+    env: python
+    plan: free
+    region: oregon
+    runtime: python-3.11.7
+    buildCommand: |
+      echo "Using Python version:"
+      python --version
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -m playwright install chromium
+    startCommand: python app.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.7"
+      - key: PIP_NO_CACHE_DIR
+        value: "1"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: "0"
+      - key: FLASK_ENV
+        value: production
+    # Add your secret environment variables in Render dashboard:
+    # SUPABASE_URL
+    # SUPABASE_KEY
+    # TWILIO_SID
+    # TWILIO_TOKEN
+    # TWILIO_WHATSAPP_NUMBER
+    # MPESA_CONSUMER_KEY
+    # MPESA_CONSUMER_SECRET
+    # MPESA_SHORTCODE
+    # MPESA_ENV
