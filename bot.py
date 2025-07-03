@@ -248,6 +248,25 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
             
             return recommendation["explanation"]
         
+        # Admin stats command (hidden feature)
+        if message_lower == 'admin_stats' and phone == 'whatsapp:+254104827342':  # Your phone number
+            try:
+                from utils.ai_helper import get_model_usage_stats
+                stats = get_model_usage_stats()
+                
+                if not stats:
+                    return "📊 *AI Model Stats:*\nNo usage data yet."
+                
+                stats_text = "📊 *AI Model Usage Stats:*\n\n"
+                for stat in stats:
+                    stats_text += f"🤖 *{stat['model']}*\n"
+                    stats_text += f"  • Attempts: {stat['attempts']}\n"
+                    stats_text += f"  • Success Rate: {stat['success_rate']}\n\n"
+                
+                return stats_text
+            except Exception as e:
+                return f"❌ Error getting stats: {str(e)}"
+
         # Handle "hi" greeting with AI enhancement
         if message_lower in ['hi', 'hello', 'start', 'help']:
             base_menu = get_categories_menu()
@@ -306,7 +325,7 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         # Check if user is trying to select a category but it's invalid (non-AI fallback)
         if not AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'jobs', 'job', 'work', 'refresh', 'new', 'reset']:
             # User might be trying to select an invalid category
-            return f"❌ Sorry, I don't recognize that job category.\n\n{get_categories_menu()}"
+            return f"🤖 Our AI advisors are busy now. Please try again in a few minutes.\n\nFor now, you can use our regular job features:\n\n{get_categories_menu()}"
         
         # Handle credit selection (1-30)
         if message_lower.isdigit():
@@ -434,10 +453,10 @@ Good luck! 🍀"""
             ai_response = ask_deepseek(f"User sent: '{message}'. This is a WhatsApp job alert bot. Provide a helpful response and guide them to available commands.")
             return ai_response["content"]
         
-        # Standard default response
-        return """🤔 I didn't understand that.
+        # Standard default response (when AI is not available)
+        return """🤖 Our AI advisors are busy now. Please try again in a few minutes.
 
-*Available commands:*
+For now, you can use these commands:
 • Send *hi* to get started
 • Send *jobs* to get job alerts
 • Send *balance* to check credits

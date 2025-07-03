@@ -138,6 +138,22 @@ class DatabaseManager:
             logger.error(f"Error checking if job was sent to {phone}: {str(e)}")
             return False
     
+    def get_last_job_sent_time(self, phone: str) -> Optional[datetime]:
+        """Get the timestamp of the last job sent to user"""
+        try:
+            response = self.supabase.table('jobs_sent').select('created_at').eq('phone', phone).order('created_at', desc=True).limit(1).execute()
+            
+            if response.data and len(response.data) > 0:
+                # Parse the timestamp from Supabase
+                timestamp_str = response.data[0]['created_at']
+                # Convert to datetime object
+                return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00')).replace(tzinfo=None)
+            
+            return None
+        except Exception as e:
+            logger.error(f"Error getting last job sent time for {phone}: {str(e)}")
+            return None
+    
     def clear_old_job_records(self, phone: str, days_old: int = 7) -> bool:
         """Clear job records to allow re-sending jobs"""
         try:
