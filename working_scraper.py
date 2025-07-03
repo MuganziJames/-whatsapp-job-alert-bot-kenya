@@ -228,31 +228,91 @@ async def scrape_myjobmag_working(interest: str) -> List[Dict[str, Any]]:
     
     return jobs
 
+def get_mock_jobs(interest: str) -> List[Dict[str, Any]]:
+    """Generate mock jobs when Playwright is not available"""
+    mock_jobs = {
+        'data entry': [
+            {'id': 'mock_de_1', 'title': 'Data Entry Clerk', 'company': 'Kenya Data Solutions', 'location': 'Nairobi', 'link': 'https://example.com/job1', 'source': 'Mock Data'},
+            {'id': 'mock_de_2', 'title': 'Data Processing Assistant', 'company': 'Digital Kenya', 'location': 'Mombasa', 'link': 'https://example.com/job2', 'source': 'Mock Data'},
+        ],
+        'sales & marketing': [
+            {'id': 'mock_sm_1', 'title': 'Sales Representative', 'company': 'Kenya Sales Corp', 'location': 'Nairobi', 'link': 'https://example.com/job3', 'source': 'Mock Data'},
+            {'id': 'mock_sm_2', 'title': 'Marketing Executive', 'company': 'Brand Kenya', 'location': 'Kisumu', 'link': 'https://example.com/job4', 'source': 'Mock Data'},
+        ],
+        'delivery & logistics': [
+            {'id': 'mock_dl_1', 'title': 'Delivery Driver', 'company': 'Kenya Logistics', 'location': 'Nairobi', 'link': 'https://example.com/job5', 'source': 'Mock Data'},
+            {'id': 'mock_dl_2', 'title': 'Warehouse Assistant', 'company': 'Supply Chain Kenya', 'location': 'Mombasa', 'link': 'https://example.com/job6', 'source': 'Mock Data'},
+        ],
+        'customer service': [
+            {'id': 'mock_cs_1', 'title': 'Customer Service Rep', 'company': 'Service Kenya', 'location': 'Nairobi', 'link': 'https://example.com/job7', 'source': 'Mock Data'},
+            {'id': 'mock_cs_2', 'title': 'Call Center Agent', 'company': 'Kenya Call Center', 'location': 'Eldoret', 'link': 'https://example.com/job8', 'source': 'Mock Data'},
+        ],
+        'finance & accounting': [
+            {'id': 'mock_fa_1', 'title': 'Accounting Assistant', 'company': 'Kenya Finance', 'location': 'Nairobi', 'link': 'https://example.com/job9', 'source': 'Mock Data'},
+            {'id': 'mock_fa_2', 'title': 'Bookkeeper', 'company': 'Kenya Books Ltd', 'location': 'Nakuru', 'link': 'https://example.com/job10', 'source': 'Mock Data'},
+        ],
+        'admin & office work': [
+            {'id': 'mock_ao_1', 'title': 'Office Assistant', 'company': 'Kenya Admin', 'location': 'Nairobi', 'link': 'https://example.com/job11', 'source': 'Mock Data'},
+            {'id': 'mock_ao_2', 'title': 'Administrative Coordinator', 'company': 'Kenya Corp', 'location': 'Mombasa', 'link': 'https://example.com/job12', 'source': 'Mock Data'},
+        ],
+        'teaching / training': [
+            {'id': 'mock_tt_1', 'title': 'Primary School Teacher', 'company': 'Kenya Education', 'location': 'Nairobi', 'link': 'https://example.com/job13', 'source': 'Mock Data'},
+            {'id': 'mock_tt_2', 'title': 'Training Coordinator', 'company': 'Kenya Training Institute', 'location': 'Kisumu', 'link': 'https://example.com/job14', 'source': 'Mock Data'},
+        ],
+        'internships / attachments': [
+            {'id': 'mock_ia_1', 'title': 'Business Intern', 'company': 'Kenya Business Solutions', 'location': 'Nairobi', 'link': 'https://example.com/job15', 'source': 'Mock Data'},
+            {'id': 'mock_ia_2', 'title': 'IT Attachment Student', 'company': 'Kenya Tech', 'location': 'Mombasa', 'link': 'https://example.com/job16', 'source': 'Mock Data'},
+        ],
+        'software engineering': [
+            {'id': 'mock_se_1', 'title': 'Software Developer', 'company': 'Kenya Tech Solutions', 'location': 'Nairobi', 'link': 'https://example.com/job17', 'source': 'Mock Data'},
+            {'id': 'mock_se_2', 'title': 'Web Developer', 'company': 'Digital Kenya', 'location': 'Nairobi', 'link': 'https://example.com/job18', 'source': 'Mock Data'},
+        ]
+    }
+    
+    return mock_jobs.get(interest, [
+        {'id': 'mock_gen_1', 'title': f'{interest.title()} Position', 'company': 'Kenya Employer', 'location': 'Kenya', 'link': 'https://example.com/job', 'source': 'Mock Data'}
+    ])
+
 def scrape_jobs_working(interest: str) -> List[Dict[str, Any]]:
     """Main working scraper function"""
     logger.info(f"🚀 WORKING SCRAPER: Searching for {interest} jobs")
     
     start_time = time.time()
     
-    # Run async scraping
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    jobs = loop.run_until_complete(scrape_myjobmag_working(interest))
-    loop.close()
+    if not PLAYWRIGHT_AVAILABLE:
+        logger.warning("⚠️ Playwright not available, using mock data")
+        return get_mock_jobs(interest)
     
-    # Remove duplicates
-    unique_jobs = {}
-    for job in jobs:
-        unique_jobs[job['id']] = job
-    
-    final_jobs = list(unique_jobs.values())
-    
-    elapsed_time = time.time() - start_time
-    
-    logger.info(f"✅ Working scraper completed in {elapsed_time:.2f}s")
-    logger.info(f"📊 Found {len(final_jobs)} unique jobs from MyJobMag")
-    
-    return final_jobs
+    try:
+        # Run async scraping
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        jobs = loop.run_until_complete(scrape_myjobmag_working(interest))
+        loop.close()
+        
+        # If no jobs found, fall back to mock data
+        if not jobs:
+            logger.info("🔄 No real jobs found, falling back to mock data")
+            return get_mock_jobs(interest)
+        
+        # Remove duplicates
+        unique_jobs = {}
+        for job in jobs:
+            unique_jobs[job['id']] = job
+        
+        final_jobs = list(unique_jobs.values())
+        
+        elapsed_time = time.time() - start_time
+        
+        logger.info(f"✅ Working scraper completed in {elapsed_time:.2f}s")
+        logger.info(f"📊 Found {len(final_jobs)} unique jobs from MyJobMag")
+        
+        return final_jobs
+        
+    except Exception as e:
+        logger.error(f"❌ Scraping failed: {str(e)}")
+        logger.info("🔄 Falling back to mock data")
+        return get_mock_jobs(interest)
 
 if __name__ == "__main__":
     # Test the working scraper
