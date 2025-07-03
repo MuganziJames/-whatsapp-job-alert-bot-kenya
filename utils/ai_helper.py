@@ -36,8 +36,51 @@ AI_CACHE = {}
 CACHE_EXPIRY_MINUTES = 30
 cache_lock = threading.Lock()
 
+# Multiple model fallback configuration - Fixed with correct working model names
+FALLBACK_MODELS = [
+    {
+        "name": "deepseek/deepseek-r1:free",
+        "description": "Primary - Best for complex career advice",
+        "max_tokens": 1000,
+        "temperature": 0.7,
+        "priority": 1
+    },
+    {
+        "name": "meta-llama/llama-4-scout:free",
+        "description": "NEW Llama 4 - Advanced multimodal reasoning",
+        "max_tokens": 900,
+        "temperature": 0.6,
+        "priority": 2
+    },
+    {
+        "name": "meta-llama/llama-4-maverick:free",
+        "description": "NEW Llama 4 - High-capacity multimodal model",
+        "max_tokens": 800,
+        "temperature": 0.7,
+        "priority": 3
+    },
+    {
+        "name": "google/gemma-2-9b-it:free",
+        "description": "Balanced general-purpose model from Google, reliable quality",
+        "max_tokens": 700,
+        "temperature": 0.6,
+        "priority": 4
+    },
+    {
+        "name": "openrouter/cypher-alpha:free",
+        "description": "Community model - final safety net if others are busy",
+        "max_tokens": 600,
+        "temperature": 0.5,
+        "priority": 5
+    }
+]
+
+# Model usage tracking
+model_usage = {}
+model_lock = threading.Lock()
+
 # Usage monitoring
-daily_usage = {"date": "", "requests": 0, "cache_hits": 0}
+daily_usage = {"date": "", "requests": 0, "cache_hits": 0, "model_switches": 0}
 usage_lock = threading.Lock()
 
 def log_usage_stats():
@@ -46,13 +89,28 @@ def log_usage_stats():
     with usage_lock:
         if daily_usage["date"] != today:
             if daily_usage["date"]:  # Not first run
-                logger.info(f"📊 Daily AI Usage Summary for {daily_usage['date']}: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits")
+                logger.info(f"📊 Daily AI Usage Summary for {daily_usage['date']}: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits, {daily_usage['model_switches']} model switches")
             daily_usage["date"] = today
             daily_usage["requests"] = 0
             daily_usage["cache_hits"] = 0
+            daily_usage["model_switches"] = 0
         
         daily_usage["requests"] += 1
-        logger.info(f"📈 Today's AI usage: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits")
+        logger.info(f"📈 Today's AI usage: {daily_usage['requests']} requests, {daily_usage['cache_hits']} cache hits, {daily_usage['model_switches']} model switches")
+
+def get_model_usage_stats():
+    """Get current model usage statistics"""
+    with model_lock:
+        stats = []
+        for model_name, usage in model_usage.items():
+            success_rate = (usage["successes"] / usage["attempts"] * 100) if usage["attempts"] > 0 else 0
+            stats.append({
+                "model": model_name.split("/")[-1],  # Short name
+                "attempts": usage["attempts"],
+                "successes": usage["successes"],
+                "success_rate": f"{success_rate:.1f}%"
+            })
+        return stats
 
 # Initialize OpenRouter client for free DeepSeek access
 AI_AVAILABLE = False
@@ -118,46 +176,73 @@ def wait_for_rate_limit():
         request_times.append(now)
         LAST_REQUEST_TIME = now
 
-def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 3) -> Any:
-    """Make AI request with intelligent retry and rate limiting"""
+def log_model_usage(model_name: str, success: bool):
+    """Log model usage statistics"""
+    with model_lock:
+        if model_name not in model_usage:
+            model_usage[model_name] = {"attempts": 0, "successes": 0, "failures": 0}
+        
+        model_usage[model_name]["attempts"] += 1
+        if success:
+            model_usage[model_name]["successes"] += 1
+        else:
+            model_usage[model_name]["failures"] += 1
+
+def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 2) -> Any:
+    """Make AI request with intelligent fallback across multiple models"""
     if not AI_AVAILABLE or not client:
         return None
     
     # Wait for rate limit clearance
     wait_for_rate_limit()
     
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"Making AI request (attempt {attempt + 1}/{max_retries})")
-            
-            response = client.chat.completions.create(
-                model="deepseek/deepseek-r1:free",
-                messages=messages,
-                max_tokens=1000,
-                temperature=0.7
-            )
-            
-            logger.info("✅ AI request successful")
-            return response
-            
-        except Exception as e:
-            error_msg = str(e)
-            logger.warning(f"AI request attempt {attempt + 1} failed: {error_msg}")
-            
-            if "429" in error_msg or "rate limit" in error_msg.lower():
-                # Exponential backoff for rate limiting
-                wait_time = (2 ** attempt) * 2  # 2, 4, 8 seconds
-                logger.info(f"Rate limited, waiting {wait_time} seconds before retry...")
-                time.sleep(wait_time)
-                continue
-            elif attempt == max_retries - 1:
-                # Last attempt failed
-                raise e
-            else:
-                # Other error, short wait and retry
-                time.sleep(1)
-                continue
+    # Try each model in fallback order
+    for model_config in FALLBACK_MODELS:
+        model_name = model_config["name"]
+        max_tokens = model_config["max_tokens"]
+        temperature = model_config["temperature"]
+        
+        logger.info(f"🤖 Trying model: {model_name}")
+        
+        for attempt in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature
+                )
+                
+                # Log successful usage
+                log_model_usage(model_name, True)
+                
+                # Log model switch if not using primary model
+                if model_config["priority"] > 1:
+                    with usage_lock:
+                        daily_usage["model_switches"] += 1
+                    logger.info(f"✅ Using fallback model: {model_config['description']}")
+                else:
+                    logger.info("✅ AI request successful with primary model")
+                
+                return response
+                
+            except Exception as e:
+                error_msg = str(e)
+                log_model_usage(model_name, False)
+                
+                if "429" in error_msg or "rate limit" in error_msg.lower():
+                    logger.warning(f"⚠️ Model {model_name} rate limited, trying next model...")
+                    break  # Try next model immediately
+                elif attempt == max_retries - 1:
+                    logger.warning(f"⚠️ Model {model_name} failed after {max_retries} attempts: {error_msg}")
+                    break  # Try next model
+                else:
+                    # Other error, short wait and retry same model
+                    time.sleep(1)
+                    continue
     
+    # All models failed
+    logger.error("❌ All AI models failed or rate limited")
     return None
 
 def get_cache_key(prompt: str, context: Dict[str, Any] = None) -> str:
@@ -234,13 +319,13 @@ def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
             }
         ]
         
-        # Use the new rate-limited request function
+        # Use the new multi-model fallback function
         response = make_ai_request_with_retry(messages)
         
         if not response:
             return {
                 "reasoning": "",
-                "content": "I'm temporarily busy processing other requests. Please try again in a moment!"
+                "content": "🤖 All our AI advisors are busy now. Please try again in a few minutes.\n\nIn the meantime, you can use our regular job alert features:\n\n📋 *Available Job Categories:*\n• *Data Entry* - Data processing jobs\n• *Sales & Marketing* - Business development roles\n• *Software Engineering* - Programming and tech jobs\n• *Customer Service* - Support and service roles\n• *Finance & Accounting* - Financial jobs\n• *Admin & Office Work* - Administrative roles\n• *Teaching / Training* - Education roles\n• *Delivery & Logistics* - Transport jobs\n• *Internships / Attachments* - Learning opportunities\n\n💡 *How to use:*\n• Send any category name to set your interest\n• Send *jobs* to get job alerts\n• Send *balance* to check your credits\n\nTry sending a job category now!"
             }
         
         reasoning = getattr(response.choices[0].message, 'reasoning_content', '')
