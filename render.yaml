@@ -1,28 +1,20 @@
 services:
   - type: web
-    name: whatsapp-job-alert-bot-kenya
+    name: whatsapp-job-bot
     env: python
     plan: free
-    region: oregon
-    runtime: python-3.11.7
-    buildCommand: |
-      echo "Using Python version:"
-      python --version
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python -m playwright install chromium
+    runtime: python-3.12.0
+    buildCommand: python --version && pip install --upgrade pip && pip install -r requirements.txt && python -m playwright install chromium
     startCommand: python app.py
-    healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.7"
+        value: 3.12.0
       - key: PIP_NO_CACHE_DIR
-        value: "1"
+        value: 1
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: "0"
-      - key: FLASK_ENV
-        value: production
-    # Add your secret environment variables in Render dashboard:
+        value: 0
+    healthCheckPath: /
+    # Add your environment variables in Render dashboard:
     # SUPABASE_URL
     # SUPABASE_KEY
     # TWILIO_SID

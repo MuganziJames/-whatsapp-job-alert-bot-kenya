@@ -31,7 +31,11 @@ def send_scheduled_job_alerts():
         users_with_balance = []
         
         # Get users for each job interest
-        interests = ['fundi', 'cleaner', 'tutor', 'driver', 'security']
+        interests = [
+            'data entry', 'sales & marketing', 'delivery & logistics',
+            'customer service', 'finance & accounting', 'admin & office work',
+            'teaching / training', 'internships / attachments', 'software engineering'
+        ]
         
         for interest in interests:
             users = db.get_users_by_interest(interest)
@@ -56,6 +60,7 @@ def send_scheduled_job_alerts():
                     continue
                 
                 # Get jobs for this interest
+                from scraper import scrape_jobs
                 jobs = scrape_jobs(interest)
                 
                 if not jobs:

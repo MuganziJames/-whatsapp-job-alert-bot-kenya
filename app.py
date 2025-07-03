@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify, Response
 import os
 from dotenv import load_dotenv
 import logging
+from datetime import datetime
 from bot import process_whatsapp_message, send_whatsapp_message
 from scheduler import start_job_scheduler, run_job_alerts_once
 
@@ -161,6 +162,99 @@ def run_alerts_now():
     except Exception as e:
         logger.error(f"Error running alerts: {str(e)}")
         return jsonify({'error': 'Failed to run alerts'}), 500
+
+@app.route('/admin/ai-analytics', methods=['GET'])
+def get_ai_analytics():
+    """Admin endpoint to get AI usage analytics"""
+    try:
+        from db import db
+        
+        days = request.args.get('days', 7, type=int)
+        analytics = db.get_ai_analytics(days)
+        
+        return jsonify({
+            'ai_analytics': analytics,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting AI analytics: {str(e)}")
+        return jsonify({'error': 'Failed to get AI analytics'}), 500
+
+@app.route('/admin/job-stats', methods=['GET'])
+def get_job_stats():
+    """Admin endpoint to get job performance statistics"""
+    try:
+        from db import db
+        
+        interest = request.args.get('interest', 'all')
+        days = request.args.get('days', 30, type=int)
+        
+        if interest == 'all':
+            # Get stats for all interests
+            interests = [
+                'data entry', 'sales & marketing', 'delivery & logistics',
+                'customer service', 'finance & accounting', 'admin & office work',
+                'teaching / training', 'internships / attachments', 'software engineering'
+            ]
+            
+            all_stats = {}
+            for int_cat in interests:
+                all_stats[int_cat] = db.get_job_performance_stats(int_cat, days)
+            
+            return jsonify({
+                'job_stats': all_stats,
+                'period_days': days,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            stats = db.get_job_performance_stats(interest, days)
+            return jsonify({
+                'job_stats': {interest: stats},
+                'period_days': days,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+    except Exception as e:
+        logger.error(f"Error getting job stats: {str(e)}")
+        return jsonify({'error': 'Failed to get job stats'}), 500
+
+@app.route('/admin/test-ai', methods=['POST'])
+def test_ai():
+    """Admin endpoint to test AI functionality"""
+    try:
+        data = request.get_json()
+        test_message = data.get('message', 'What does a software developer do?')
+        
+        # Test AI helper
+        try:
+            from utils.ai_helper import ask_deepseek, AI_AVAILABLE
+            
+            if not AI_AVAILABLE:
+                return jsonify({
+                    'ai_available': False,
+                    'message': 'AI helper not available'
+                })
+            
+            response = ask_deepseek(test_message)
+            
+            return jsonify({
+                'ai_available': True,
+                'test_message': test_message,
+                'ai_response': response,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as ai_error:
+            return jsonify({
+                'ai_available': False,
+                'error': str(ai_error),
+                'timestamp': datetime.now().isoformat()
+            })
+        
+    except Exception as e:
+        logger.error(f"Error testing AI: {str(e)}")
+        return jsonify({'error': 'Failed to test AI'}), 500
 
 if __name__ == '__main__':
     # Start the job scheduler

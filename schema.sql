@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20) UNIQUE NOT NULL,
     interest VARCHAR(50),
     balance INTEGER DEFAULT 0,
+    preferences TEXT, -- JSON string for AI-learned preferences
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -22,6 +23,27 @@ CREATE TABLE IF NOT EXISTS jobs_sent (
     UNIQUE(phone, job_id)
 );
 
+-- AI interactions table for analytics and personalization
+CREATE TABLE IF NOT EXISTS ai_interactions (
+    id SERIAL PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL,
+    user_message TEXT NOT NULL,
+    ai_response TEXT NOT NULL,
+    interaction_type VARCHAR(50) DEFAULT 'general',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Job AI analysis table for improving job matching
+CREATE TABLE IF NOT EXISTS job_ai_analysis (
+    id SERIAL PRIMARY KEY,
+    job_id VARCHAR(100) NOT NULL,
+    match_score INTEGER DEFAULT 0,
+    quality_score INTEGER DEFAULT 0,
+    should_send BOOLEAN DEFAULT false,
+    analysis_text TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_interest ON users(interest);
@@ -29,10 +51,17 @@ CREATE INDEX IF NOT EXISTS idx_users_balance ON users(balance);
 CREATE INDEX IF NOT EXISTS idx_jobs_sent_phone ON jobs_sent(phone);
 CREATE INDEX IF NOT EXISTS idx_jobs_sent_job_id ON jobs_sent(job_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_sent_sent_at ON jobs_sent(sent_at);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_phone ON ai_interactions(phone);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_created_at ON ai_interactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_interactions_type ON ai_interactions(interaction_type);
+CREATE INDEX IF NOT EXISTS idx_job_ai_analysis_job_id ON job_ai_analysis(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_ai_analysis_created_at ON job_ai_analysis(created_at);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE jobs_sent ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ai_interactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE job_ai_analysis ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for authenticated access
 -- This allows your backend service to access all data when authenticated
@@ -40,6 +69,12 @@ CREATE POLICY "Allow all operations for authenticated users" ON users
 FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Allow all operations for authenticated users" ON jobs_sent
+FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow all operations for authenticated users" ON ai_interactions
+FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow all operations for authenticated users" ON job_ai_analysis
 FOR ALL USING (auth.role() = 'authenticated');
 
 -- Function to update updated_at timestamp
