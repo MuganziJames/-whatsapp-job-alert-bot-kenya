@@ -1,8 +1,8 @@
-# 🚀 Ajirawise Deployment Guide - Same Repo, Separate Services
+# 🚀 Ajirawise Deployment Guide - Dual Service Blueprint
 
 ## 🎯 **Overview**
 
-Deploy both WhatsApp and Telegram bots as separate Render services from the same GitHub repository. Each service gets **750 hours/month** (full uptime).
+Deploy both WhatsApp and Telegram bots as separate Render services from a single `render.yaml` blueprint. Each service gets **750 hours/month** (full uptime).
 
 ## 📊 **What You'll Get**
 
@@ -21,13 +21,13 @@ Deploy both WhatsApp and Telegram bots as separate Render services from the same
 git add .
 
 # Commit changes
-git commit -m "Deploy Ajirawise as separate services"
+git commit -m "Deploy Ajirawise with dual service blueprint"
 
 # Push to GitHub
 git push origin main
 ```
 
-### **Step 2: Deploy WhatsApp Service**
+### **Step 2: Deploy Both Services with One Blueprint**
 
 1. **Go to Render Dashboard**
 
@@ -37,73 +37,59 @@ git push origin main
 2. **Connect Repository**
 
    - Select your GitHub account
-   - Choose your repository: `vibeCoding`
+   - Choose your repository: `MuganziJames/-whatsapp-job-alert-bot-kenya`
+   - Branch: `master`
    - Click **"Connect"**
 
-3. **Configure Blueprint**
-
-   - **Blueprint Name**: `Ajirawise WhatsApp Service`
-   - **Blueprint File**: `whatsapp-render.yaml`
+3. **Deploy Blueprint**
+   - Render will automatically detect `render.yaml`
    - Click **"Apply"**
+   - Both services will be created automatically:
+     - `ajirawise-whatsapp-bot` (Web Service)
+     - `ajirawise-telegram-bot` (Background Worker)
 
-4. **Set Environment Variables**
-   Go to the created service → **Environment** tab and add:
+### **Step 3: Set Environment Variables**
 
-   ```bash
-   # Database (Supabase)
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=your-supabase-anon-key
+You need to set environment variables for **BOTH services**:
 
-   # WhatsApp (Twilio)
-   TWILIO_SID=your-twilio-sid
-   TWILIO_TOKEN=your-twilio-token
-   TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+#### **For WhatsApp Service (`ajirawise-whatsapp-bot`)**
 
-   # AI Integration
-   OPENROUTER_API_KEY=your-openrouter-key
+Go to WhatsApp service → **Environment** tab and add:
 
-   # Flask Configuration
-   PORT=10000
-   FLASK_ENV=production
-   FLASK_DEBUG=False
-   ```
+```bash
+# Database (Supabase)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
 
-5. **Deploy**
-   - Click **"Create Web Service"**
-   - Wait for deployment to complete
-   - Note your service URL: `https://ajirawise-whatsapp-bot.onrender.com`
+# WhatsApp (Twilio)
+TWILIO_SID=your-twilio-sid
+TWILIO_TOKEN=your-twilio-token
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
 
-### **Step 3: Deploy Telegram Service**
+# AI Integration
+OPENROUTER_API_KEY=your-openrouter-key
 
-1. **Create Second Service**
+# Flask Configuration
+PORT=10000
+FLASK_ENV=production
+FLASK_DEBUG=False
+```
 
-   - Click **"New +"** → **"Blueprint"** again
-   - Connect the **same** repository: `vibeCoding`
+#### **For Telegram Service (`ajirawise-telegram-bot`)**
 
-2. **Configure Blueprint**
+Go to Telegram service → **Environment** tab and add:
 
-   - **Blueprint Name**: `Ajirawise Telegram Service`
-   - **Blueprint File**: `telegram-render.yaml`
-   - Click **"Apply"**
+```bash
+# Database (Supabase) - Same as WhatsApp
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
 
-3. **Set Environment Variables**
-   Go to the created service → **Environment** tab and add:
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 
-   ```bash
-   # Database (Supabase) - Same as WhatsApp
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_KEY=your-supabase-anon-key
-
-   # Telegram Bot
-   TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-
-   # AI Integration - Same as WhatsApp
-   OPENROUTER_API_KEY=your-openrouter-key
-   ```
-
-4. **Deploy**
-   - Click **"Create Background Worker"**
-   - Wait for deployment to complete
+# AI Integration - Same as WhatsApp
+OPENROUTER_API_KEY=your-openrouter-key
+```
 
 ### **Step 4: Configure Webhooks**
 
@@ -198,28 +184,29 @@ INFO:telegram_bot:Starting polling...
 
 ### **Common Issues**
 
-1. **Service Won't Start**
+1. **Blueprint Deployment Failed**
 
-   - Check environment variables are set correctly
-   - Verify blueprint file path is correct
-   - Check logs for specific error messages
+   - Check that `render.yaml` exists in your repository
+   - Verify the YAML syntax is correct
+   - Check build logs for specific errors
 
-2. **WhatsApp Not Responding**
+2. **Environment Variables**
+
+   - Make sure to set variables for BOTH services
+   - WhatsApp service needs Twilio credentials
+   - Telegram service needs bot token
+   - Both need Supabase and OpenRouter keys
+
+3. **WhatsApp Not Responding**
 
    - Verify Twilio webhook URL is correct
    - Check if service is sleeping (send a message to wake it)
    - Verify Twilio credentials
 
-3. **Telegram Not Responding**
-
+4. **Telegram Not Responding**
    - Check Telegram bot token is correct
    - Verify service is running (check logs)
    - Ensure bot is not blocked
-
-4. **Database Errors**
-   - Verify Supabase URL and key
-   - Check if database tables exist
-   - Test database connection
 
 ### **Useful Commands**
 
@@ -230,7 +217,7 @@ curl https://ajirawise-whatsapp-bot.onrender.com/health
 # View service logs
 # (Use Render dashboard)
 
-# Restart service
+# Restart services
 # (Use Render dashboard - "Manual Deploy")
 ```
 
@@ -238,9 +225,11 @@ curl https://ajirawise-whatsapp-bot.onrender.com/health
 
 ## 🎉 **Success Checklist**
 
-✅ **GitHub**: Code pushed successfully  
-✅ **WhatsApp Service**: Deployed and responding  
-✅ **Telegram Service**: Deployed and responding  
+✅ **GitHub**: Code pushed with `render.yaml`  
+✅ **Blueprint**: Deployed successfully  
+✅ **WhatsApp Service**: Running and responding  
+✅ **Telegram Service**: Running and responding  
+✅ **Environment Variables**: Set for both services  
 ✅ **Webhooks**: Twilio configured correctly  
 ✅ **Database**: Supabase connected  
 ✅ **Health Checks**: Both services healthy  
@@ -253,7 +242,7 @@ curl https://ajirawise-whatsapp-bot.onrender.com/health
 If you encounter issues:
 
 1. Check service logs in Render dashboard
-2. Verify all environment variables
+2. Verify all environment variables are set for both services
 3. Test health endpoints
 4. Check Twilio webhook configuration
 

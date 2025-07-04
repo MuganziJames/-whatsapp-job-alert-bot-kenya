@@ -56,6 +56,4 @@ Thumbs.db
 
 # Deployment
 Procfile
-render.yaml
-gunicorn.conf.py
-RENDER_DEPLOYMENT.md 
+gunicorn.conf.py 
