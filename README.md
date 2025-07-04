@@ -20,7 +20,7 @@ We've invested in **professional cloud hosting on Render.com** to ensure:
 
 ### 🤖 Choose Your Platform:
 
-- **📱 WhatsApp**: +1 415 523 8886 (join code: `seat-dear`) - _Rate limited_
+- **📱 WhatsApp**: +1 415 523 8886 (join code: `join seat-dear`) - _Rate limited_
 - **🚀 Telegram**: [t.me/Ajirawise_bot](https://t.me/Ajirawise_bot) - _Unlimited usage_ ⭐ **RECOMMENDED**
 
 ## 🎯 How to Use the Bot (For Job Seekers)
