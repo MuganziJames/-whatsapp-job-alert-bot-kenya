@@ -10,4 +10,5 @@ gunicorn==21.2.0
 lxml==4.9.3
 playwright==1.40.0 
 openai>=1.0.0
-twilio==8.9.1 
+twilio==8.9.1
+python-telegram-bot==21.0 

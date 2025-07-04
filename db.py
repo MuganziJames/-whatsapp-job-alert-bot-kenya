@@ -21,14 +21,26 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     def __init__(self):
+        # Ensure environment variables are loaded
+        load_dotenv()
         
         self.url = os.getenv('SUPABASE_URL')
         self.key = os.getenv('SUPABASE_KEY')
         
         if not self.url or not self.key:
-            raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in environment variables")
+            # Try loading .env again in case it wasn't loaded properly
+            from pathlib import Path
+            env_path = Path('.env')
+            if env_path.exists():
+                load_dotenv(env_path)
+                self.url = os.getenv('SUPABASE_URL')
+                self.key = os.getenv('SUPABASE_KEY')
+        
+        if not self.url or not self.key:
+            raise ValueError(f"SUPABASE_URL and SUPABASE_KEY must be set in environment variables. Found URL: {bool(self.url)}, Found KEY: {bool(self.key)}")
         
         self.supabase: Client = create_client(self.url, self.key)
+        logger.info("✅ Database connection initialized successfully")
     
     def get_user_by_phone(self, phone: str) -> Optional[Dict[str, Any]]:
         """Get user by phone number"""
@@ -40,6 +52,60 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting user by phone {phone}: {str(e)}")
             return None
+    
+    def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user by user_id (works for both phone and telegram ID)"""
+        try:
+            response = self.supabase.table('users').select('*').eq('phone', user_id).execute()
+            if response.data:
+                return response.data[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting user by ID {user_id}: {str(e)}")
+            return None
+    
+    def add_user(self, user_id: str, platform: str = 'whatsapp', username: str = None) -> bool:
+        """Add new user for any platform"""
+        try:
+            existing_user = self.get_user(user_id)
+            if existing_user:
+                # Update platform info if needed
+                if existing_user.get('platform') != platform:
+                    self.supabase.table('users').update({
+                        'platform': platform,
+                        'username': username
+                    }).eq('phone', user_id).execute()
+                return True
+            
+            # Create new user
+            user_data = {
+                'phone': user_id,
+                'platform': platform,
+                'username': username or user_id,
+                'interest': '',
+                'balance': 0,
+                'interests': []
+            }
+            response = self.supabase.table('users').insert(user_data).execute()
+            logger.info(f"Created new {platform} user: {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error adding user {user_id}: {str(e)}")
+            return False
+    
+    def set_user_interests(self, user_id: str, interests: List[str]) -> bool:
+        """Set user's job interests"""
+        try:
+            response = self.supabase.table('users').update({
+                'interests': interests,
+                'interest': interests[0] if interests else ''
+            }).eq('phone', user_id).execute()
+            logger.info(f"Updated interests for {user_id}: {interests}")
+            return True
+        except Exception as e:
+            logger.error(f"Error setting interests for {user_id}: {str(e)}")
+            return False
     
     def add_or_update_user(self, phone: str, interest: str = None, balance: int = None) -> Optional[Dict[str, Any]]:
         """Add new user or update existing user"""
@@ -315,5 +381,18 @@ class DatabaseManager:
             logger.error(f"Error getting job performance stats: {str(e)}")
             return {'error': str(e)}
 
-# Initialize database manager
-db = DatabaseManager() 
+# Lazy initialization of database manager
+_db_instance = None
+
+class LazyDB:
+    """Lazy database wrapper that initializes only when accessed"""
+    def __getattr__(self, name):
+        global _db_instance
+        if _db_instance is None:
+            # Ensure environment variables are loaded
+            load_dotenv()
+            _db_instance = DatabaseManager()
+        return getattr(_db_instance, name)
+
+# Create lazy database instance
+db = LazyDB() 

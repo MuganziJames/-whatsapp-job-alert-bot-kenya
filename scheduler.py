@@ -189,33 +189,16 @@ def send_smart_job_alerts():
                     logger.info(f"No jobs found for {interest}")
                     continue
                 
-                # AI-powered job filtering and ranking
-                if AI_AVAILABLE:
-                    logger.info(f"🤖 AI filtering {len(jobs)} jobs for {interest}")
-                    
-                    # Filter jobs using AI
-                    filtered_jobs = []
-                    for job in jobs:
-                        if not db.was_job_sent(phone, job['id']):
-                            # Use AI to improve job matching
-                            try:
-                                job_analysis = improve_job_matching(
-                                    job.get('title', ''),
-                                    job.get('company', ''),
-                                    interest
-                                )
-                                
-                                if job_analysis['should_send']:
-                                    job['ai_score'] = job_analysis['match_score']
-                                    filtered_jobs.append(job)
-                            except Exception as e:
-                                logger.error(f"AI filtering error: {str(e)}")
-                                # Include job anyway if AI fails
-                                filtered_jobs.append(job)
-                    
-                    # Sort by AI score (highest first)
-                    filtered_jobs.sort(key=lambda x: x.get('ai_score', 50), reverse=True)
-                    jobs = filtered_jobs
+                # Basic job filtering (AI disabled to preserve rate limits)
+                logger.info(f"📋 Basic filtering {len(jobs)} jobs for {interest}")
+                
+                # Simple filtering - just check if job hasn't been sent
+                filtered_jobs = []
+                for job in jobs:
+                    if not db.was_job_sent(phone, job['id']):
+                        filtered_jobs.append(job)
+                
+                jobs = filtered_jobs
                 
                 # Send first available job that hasn't been sent
                 job_sent = False

@@ -516,22 +516,29 @@ Format your response as a helpful WhatsApp message."""
 def improve_job_matching(job_title: str, job_description: str, user_interest: str) -> Dict[str, Any]:
     """Use AI to improve job matching beyond keyword matching"""
     try:
+        # Handle minimal job descriptions common in scraped jobs
+        description_text = job_description if job_description and len(job_description.strip()) > 10 else "No detailed description provided"
+        
         prompt = f"""Analyze if this job matches the user's interest category.
 
 Job Title: {job_title}
-Job Description: {job_description[:500]}...
+Job Description: {description_text}
 User Interest: {user_interest}
 
+IMPORTANT: Many legitimate job postings from job boards have minimal descriptions but are still valid opportunities.
+
 Consider:
-1. Job responsibilities and required skills
-2. Career progression opportunities
-3. Relevance to the user's chosen category
-4. Job quality and legitimacy
+1. Does the job title align with the user's interest category?
+2. Are there obvious red flags (scam, fake, spam)?
+3. Does this look like a legitimate job posting?
+4. For scraped jobs with minimal descriptions, focus on title relevance
+
+Be more lenient with quality scores for jobs with minimal descriptions if the title seems legitimate.
 
 Respond with:
-- match_score: 0-100 (how well it matches)
+- match_score: 0-100 (how well it matches the category)
 - reasoning: Brief explanation
-- quality_score: 0-100 (job posting quality)
+- quality_score: 0-100 (job posting quality - be generous for minimal descriptions)
 - red_flags: Any concerns about the job posting
 """
         
@@ -548,11 +555,29 @@ Respond with:
         match_score = extract_score(content, "match_score")
         quality_score = extract_score(content, "quality_score")
         
+        # More lenient filtering for scraped jobs with minimal descriptions
+        min_match_score = 40  # Reduced from 60
+        min_quality_score = 30  # Reduced from 50
+        
+        # Additional check: if it's a very short job description, be more lenient
+        if len(description_text.strip()) < 50:
+            min_quality_score = 25
+        
+        # Check for obvious red flags in title
+        red_flag_terms = ['scam', 'fake', 'spam', 'too good to be true', 'earn money fast', 'work from home easy money']
+        has_red_flags = any(term in job_title.lower() for term in red_flag_terms)
+        
+        should_send = (
+            match_score > min_match_score and 
+            quality_score > min_quality_score and 
+            not has_red_flags
+        )
+        
         return {
             "match_score": match_score,
             "quality_score": quality_score,
             "analysis": content,
-            "should_send": match_score > 60 and quality_score > 50
+            "should_send": should_send
         }
         
     except Exception as e:

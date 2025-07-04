@@ -302,9 +302,16 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
                     else:
                         return f"✅ Interest updated to *{normalized_category.title()}* jobs!\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *10* to get 10 credits"
             else:
-                # Create new user (always needs credits)
+                # Create new user and check if they have credits
                 new_user = db.add_or_update_user(phone, interest=normalized_category, balance=0)
-                return f"✅ Great! You're now registered for *{normalized_category.title()}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
+                # Get fresh user data to check current balance
+                fresh_user = db.get_user_by_phone(phone)
+                current_balance = fresh_user.get('balance', 0) if fresh_user else 0
+                
+                if current_balance > 0:
+                    return f"✅ Great! You're now registered for *{normalized_category.title()}* job alerts.\n\n💳 Current Balance: *{current_balance}* credits\n\nSend *jobs* to get job alerts!"
+                else:
+                    return f"✅ Great! You're now registered for *{normalized_category.title()}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
         
         # AI-powered fallback for unrecognized categories
         if AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'jobs', 'job', 'work', 'refresh', 'new', 'reset']:
@@ -351,7 +358,11 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         # Handle balance check
         if message_lower in ['balance', 'credits', 'account']:
             if user:
-                return f"💳 *Account Balance:*\nCredits: *{user['balance']}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend a number (1-30) to add more credits!"
+                balance = user.get('balance', 0)
+                if balance > 0:
+                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend *jobs* to get job alerts!"
+                else:
+                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend a number (1-30) to add more credits!"
             else:
                 return "❌ You're not registered yet. Send *hi* to get started!"
         
@@ -382,28 +393,16 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
             if not jobs:
                 return f"😔 No new *{user['interest']}* jobs available right now. We'll keep looking!"
             
-            # AI-powered job filtering and ranking
-            if AI_AVAILABLE:
-                logger.info(f"🤖 AI filtering {len(jobs)} jobs for {user['interest']}")
-                
-                # Filter jobs using AI
-                filtered_jobs = []
-                for job in jobs:
-                    if not has_job_been_sent(phone, job['id']):
-                        # Use AI to improve job matching
-                        job_analysis = improve_job_matching(
-                            job.get('title', ''),
-                            job.get('company', ''),
-                            user['interest']
-                        )
-                        
-                        if job_analysis['should_send']:
-                            job['ai_score'] = job_analysis['match_score']
-                            filtered_jobs.append(job)
-                
-                # Sort by AI score (highest first)
-                filtered_jobs.sort(key=lambda x: x.get('ai_score', 50), reverse=True)
-                jobs = filtered_jobs
+            # Basic job filtering (AI disabled to preserve rate limits)
+            logger.info(f"📋 Basic filtering {len(jobs)} jobs for {user['interest']}")
+            
+            # Simple filtering - just check if job hasn't been sent
+            filtered_jobs = []
+            for job in jobs:
+                if not has_job_been_sent(phone, job['id']):
+                    filtered_jobs.append(job)
+            
+            jobs = filtered_jobs
             
             # Find first job that hasn't been sent
             job_to_send = None
