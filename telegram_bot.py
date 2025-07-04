@@ -572,7 +572,8 @@ def main() -> None:
     
         # Start the bot
         logger.info("Starting polling...")
-        app.run_polling()
+        # Disable signal handling since this may run in a background thread (Render starts Flask wrapper)
+        app.run_polling(stop_signals=None)
     except Exception as e:
         logger.critical(f"Failed to start Telegram bot: {e}", exc_info=True)
         raise

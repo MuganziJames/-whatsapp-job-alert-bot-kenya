@@ -24,9 +24,14 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
     """Health check endpoint"""
+    # If this is a POST request (likely a misrouted webhook), redirect to proper endpoint
+    if request.method == 'POST':
+        logger.warning("Received POST to / - redirecting to /whatsapp")
+        return whatsapp_webhook()
+    
     return jsonify({
         'status': 'active',
         'service': 'Ajirawise - Smart Job Alert Bot',
