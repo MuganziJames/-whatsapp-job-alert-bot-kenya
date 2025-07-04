@@ -583,5 +583,46 @@ def main() -> None:
         except:
             pass
 
+def run_web_server():
+    """Run a simple web server for Render deployment"""
+    from flask import Flask, jsonify
+    import threading
+    import os
+    
+    flask_app = Flask(__name__)
+    
+    @flask_app.route('/')
+    def health():
+        return jsonify({
+            'status': 'healthy',
+            'service': 'Ajirawise Telegram Bot',
+            'version': '2.0.0'
+        })
+    
+    @flask_app.route('/health')
+    def health_check():
+        return jsonify({
+            'status': 'healthy',
+            'service': 'Ajirawise Telegram Bot',
+            'version': '2.0.0',
+            'bot_running': True
+        })
+    
+    # Start Telegram bot in a separate thread
+    def start_telegram_bot():
+        main()
+    
+    telegram_thread = threading.Thread(target=start_telegram_bot, daemon=True)
+    telegram_thread.start()
+    
+    # Start Flask web server
+    port = int(os.getenv('PORT', 10001))
+    logger.info(f"Starting Telegram bot web server on port {port}")
+    flask_app.run(host='0.0.0.0', port=port, debug=False)
+
 if __name__ == "__main__":
-    main() 
+    # Check if we're running on Render (has PORT env var)
+    if os.getenv('PORT'):
+        run_web_server()
+    else:
+        main() 

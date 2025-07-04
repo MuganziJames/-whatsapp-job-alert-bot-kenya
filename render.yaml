@@ -14,8 +14,8 @@ services:
       - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
         value: "1"
 
-  # Telegram Bot Service (Background Worker)
-  - type: worker
+      # Telegram Bot Service (Web Service - Free Plan Compatible)
+  - type: web
     name: ajirawise-telegram-bot
     env: python
     plan: free
@@ -28,3 +28,5 @@ services:
         value: /opt/render/project/.cache/ms-playwright
       - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
         value: "1"
+      - key: PORT
+        value: "10001"
