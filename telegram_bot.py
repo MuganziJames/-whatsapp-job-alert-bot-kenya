@@ -349,7 +349,9 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             return "❌ System error: Unable to retrieve user information. Please try again later."
         
         # AI-powered career question detection (with rate limiting protection)
-        if AI_AVAILABLE:
+        # Skip AI for simple greetings to avoid rate limiting issues
+        simple_greetings = ['hi', 'hello', 'hey', 'hey hi', 'hello hi', 'hi there', 'hey there', 'start', 'help']
+        if AI_AVAILABLE and message_lower not in simple_greetings:
             try:
                 is_career = is_career_question(message)
                 if is_career:
@@ -363,6 +365,11 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
                     
                     # Get AI response with fallback handling
                     ai_response = ask_deepseek(message, user_context)
+                    
+                    # If AI response indicates rate limiting or failure, provide basic greeting
+                    if not ai_response or not ai_response.get("content") or "daily AI limit" in ai_response.get("content", ""):
+                        logger.warning("AI rate limited, providing basic greeting fallback")
+                        return get_categories_menu()
                     
                     # Check if AI suggests a job category (only if not rate limited)
                     if "daily AI limit" not in ai_response["content"]:
@@ -403,8 +410,9 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             
             return recommendation["explanation"]
 
-        # Handle "hi" greeting with AI enhancement
-        if message_lower in ['hi', 'hello', 'start', 'help', '/start']:
+        # Handle greeting variations with AI enhancement
+        greeting_patterns = ['hi', 'hello', 'start', 'help', '/start', 'hey', 'hey hi', 'hello hi', 'hi there', 'hey there']
+        if message_lower in greeting_patterns or any(pattern in message_lower for pattern in ['hi', 'hello', 'hey'] if len(message_lower.split()) <= 3):
             base_menu = get_categories_menu()
         
             if AI_AVAILABLE and user and user.get('interests'):
