@@ -24,12 +24,10 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
-# Start the job scheduler when the app is imported (not just when run directly)
-try:
-    start_job_scheduler()
-    logger.info("✅ Smart job scheduler started automatically")
-except Exception as e:
-    logger.error(f"❌ Failed to start scheduler: {e}")
+# Automatic job scheduler DISABLED to prevent conflicts with multiple bot instances
+# Jobs are now sent only when users explicitly request them using smart detection
+# This prevents the conflict: "terminated by other getUpdates request"
+logger.info("🔇 Automatic job scheduler disabled - using on-demand job delivery")
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -308,14 +306,14 @@ def test_ai():
         return jsonify({'error': 'Failed to test AI'}), 500
 
 if __name__ == '__main__':
-    # Start the job scheduler
-    start_job_scheduler()
+    # Automatic job scheduler DISABLED to prevent conflicts
+    # Jobs are now sent only when users explicitly request them
     
     # Get port from environment or use default
     port = int(os.getenv('PORT', 5000))
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
     logger.info(f"Starting Ajirawise - Smart Job Alert Bot on port {port}")
-    logger.info("Job scheduler started - will run every 60 minutes")
+    logger.info("🔇 Automatic scheduler disabled - using on-demand job delivery")
     
     app.run(host='0.0.0.0', port=port, debug=debug_mode) 

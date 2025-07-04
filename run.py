@@ -23,10 +23,10 @@ if __name__ == '__main__':
     print(f"🔧 Debug mode: {debug}")
     print("💡 Send 'Hi' to your Ajirawise bot to get started!")
     
-    # Start the smart job scheduler
-    print("🧠 Starting smart job scheduler...")
-    print("⏰ Schedule: Every 2 minutes for first 5 jobs, then 2-4 hours")
-    start_smart_job_scheduler()
+    # Smart job scheduler DISABLED to prevent bot instance conflicts
+    print("🔇 Automatic job scheduler disabled")
+    print("📱 Jobs will be sent only when users explicitly request them")
+    print("✨ This prevents Telegram bot conflicts and improves user experience")
     
     try:
         app.run(host=host, port=port, debug=debug)

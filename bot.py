@@ -66,6 +66,19 @@ except ImportError as e:
     AI_AVAILABLE = False
     logger.warning(f"⚠️ AI Helper not available: {str(e)}")
 
+# Smart Job Detection import
+try:
+    from utils.smart_job_detection import (
+        detect_job_request,
+        is_smart_job_request,
+        extract_job_context_from_message
+    )
+    SMART_JOB_DETECTION_AVAILABLE = True
+    logger.info("🧠 Smart Job Detection loaded successfully")
+except ImportError as e:
+    SMART_JOB_DETECTION_AVAILABLE = False
+    logger.warning(f"⚠️ Smart Job Detection not available: {str(e)}")
+
 def get_categories_menu() -> str:
     """Get formatted categories menu for welcome message"""
     return """🔍 *Welcome to Ajirawise - Your Smart Job Assistant!*
@@ -496,8 +509,16 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
                 else:
                     return f"✅ Great! You're now registered for *{normalized_category.title()}* job alerts.\n\n💰 *Choose your credits:*\nSend a number from *1 to 30* to get that many job alert credits.\n\nExample: Send *5* to get 5 credits"
         
-        # AI-powered fallback for unrecognized categories
-        if AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'jobs', 'job', 'work', 'refresh', 'new', 'reset']:
+        # Check if this might be a job request that wasn't handled above (user not registered)
+        if SMART_JOB_DETECTION_AVAILABLE and is_smart_job_request(message, threshold=0.4):
+            return f"🔍 I detected you're looking for jobs! To get started:\n\n1. Send *hi* to register\n2. Choose your job interest\n3. Add credits (1-30)\n4. Start receiving job alerts!\n\n💡 *Try*: Send *hi* to begin"
+        
+        # AI-powered fallback for unrecognized categories (excluding job requests)
+        if AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'refresh', 'new', 'reset']:
+            # Skip AI processing if this is already identified as a job request
+            if SMART_JOB_DETECTION_AVAILABLE and is_smart_job_request(message, threshold=0.2):
+                return f"🔍 I understand you're looking for jobs! Please register first by sending *hi* and selecting your job interest."
+            
             # Check if user might be trying to express a job interest
             suggested_interest = extract_job_interest(message)
             if suggested_interest:
@@ -513,7 +534,11 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
             return ai_response["content"]
         
         # Check if user is trying to select a category but it's invalid (non-AI fallback)
-        if not AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'jobs', 'job', 'work', 'refresh', 'new', 'reset']:
+        if not AI_AVAILABLE and not message_lower.isdigit() and not message_lower in ['balance', 'credits', 'account', 'refresh', 'new', 'reset']:
+            # Check if this might be a job request using smart detection
+            if SMART_JOB_DETECTION_AVAILABLE and is_smart_job_request(message, threshold=0.3):
+                return f"🔍 I detected you're looking for jobs! To get started:\n\n1. Send *hi* to register\n2. Choose your job interest\n3. Add credits (1-30)\n4. Start receiving job alerts!\n\n💡 *Try*: Send *hi* to begin"
+            
             # User might be trying to select an invalid category
             return f"🤖 Our AI advisors are busy now. Please try again in a few minutes.\n\nFor now, you can use our regular job features:\n\n{get_categories_menu()}"
         
@@ -558,8 +583,22 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
             db.clear_old_job_records(phone, days_old=0)  # Clear all records
             return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\nSend *jobs* to get fresh job alerts."
         
+        # Smart job request detection - enhanced with natural language understanding
+        is_job_request = False
+        job_confidence = 0.0
+        
+        # Check if this is a job request using smart detection
+        if SMART_JOB_DETECTION_AVAILABLE:
+            is_job_request, job_confidence, detection_reason = detect_job_request(message)
+            if is_job_request:
+                logger.info(f"🧠 Smart detection identified job request: {message[:50]} "
+                           f"(confidence: {job_confidence:.2f}, reason: {detection_reason})")
+        else:
+            # Fallback to simple keyword detection
+            is_job_request = message_lower in ['jobs', 'job', 'work']
+        
         # Handle job request with AI enhancement
-        if message_lower in ['jobs', 'job', 'work']:
+        if is_job_request:
             if not user:
                 return "❌ Please register first by sending *hi*"
             

@@ -36,7 +36,7 @@ AI_CACHE = {}
 CACHE_EXPIRY_MINUTES = 30
 cache_lock = threading.Lock()
 
-# Multiple model fallback configuration - Fixed with correct working model names
+# Multiple model fallback configuration - Optimized with 4 models for faster response
 FALLBACK_MODELS = [
     {
         "name": "deepseek/deepseek-r1:free",
@@ -53,25 +53,18 @@ FALLBACK_MODELS = [
         "priority": 2
     },
     {
-        "name": "meta-llama/llama-4-maverick:free",
-        "description": "NEW Llama 4 - High-capacity multimodal model",
-        "max_tokens": 800,
-        "temperature": 0.7,
-        "priority": 3
-    },
-    {
         "name": "google/gemma-2-9b-it:free",
         "description": "Balanced general-purpose model from Google, reliable quality",
         "max_tokens": 700,
         "temperature": 0.6,
-        "priority": 4
+        "priority": 3
     },
     {
         "name": "openrouter/cypher-alpha:free",
         "description": "Community model - final safety net if others are busy",
         "max_tokens": 600,
         "temperature": 0.5,
-        "priority": 5
+        "priority": 4
     }
 ]
 
@@ -188,8 +181,8 @@ def log_model_usage(model_name: str, success: bool):
         else:
             model_usage[model_name]["failures"] += 1
 
-def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 2) -> Any:
-    """Make AI request with intelligent fallback across multiple models"""
+def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 1) -> Any:
+    """Make AI request with intelligent fallback across multiple models (optimized for speed)"""
     if not AI_AVAILABLE or not client:
         return None
     
@@ -234,11 +227,11 @@ def make_ai_request_with_retry(messages: List[Dict], max_retries: int = 2) -> An
                     logger.warning(f"⚠️ Model {model_name} rate limited, trying next model...")
                     break  # Try next model immediately
                 elif attempt == max_retries - 1:
-                    logger.warning(f"⚠️ Model {model_name} failed after {max_retries} attempts: {error_msg}")
+                    logger.warning(f"⚠️ Model {model_name} failed after {max_retries} attempt(s): {error_msg}")
                     break  # Try next model
                 else:
                     # Other error, short wait and retry same model
-                    time.sleep(1)
+                    time.sleep(0.5)  # Reduced wait time for faster response
                     continue
     
     # All models failed
