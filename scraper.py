@@ -30,15 +30,51 @@ except ImportError:
 
 # Enhanced search terms
 ENHANCED_SEARCH_TERMS = {
-    'data entry': ['data entry', 'data input', 'data processing', 'data clerk', 'data operator', 'typing', 'keying', 'data capture'],
-    'sales & marketing': ['sales', 'marketing', 'business development', 'sales rep', 'account manager', 'marketing manager', 'sales executive', 'marketing executive', 'sales agent', 'promoter'],
-    'delivery & logistics': ['delivery', 'logistics', 'transport', 'courier', 'driver', 'dispatch', 'shipping', 'warehouse', 'supply chain', 'distribution'],
-    'customer service': ['customer service', 'customer support', 'call center', 'help desk', 'customer care', 'client service', 'support agent', 'service representative'],
-    'finance & accounting': ['finance', 'accounting', 'bookkeeping', 'accountant', 'financial', 'accounts', 'audit', 'tax', 'payroll', 'finance officer'],
-    'admin & office work': ['admin', 'administrative', 'office', 'secretary', 'receptionist', 'clerk', 'assistant', 'coordinator', 'office manager', 'office assistant'],
-    'teaching / training': ['teacher', 'training', 'tutor', 'instructor', 'educator', 'trainer', 'teaching', 'academic', 'coach', 'facilitator'],
-    'internships / attachments': ['internship', 'intern', 'attachment', 'trainee', 'graduate', 'entry level', 'junior', 'apprentice', 'student'],
-    'software engineering': ['software', 'developer', 'programmer', 'engineering', 'coding', 'web developer', 'mobile developer', 'software engineer', 'tech', 'IT', 'systems']
+    'data entry': [
+        'data entry', 'data input', 'data processing', 'data clerk', 'data operator', 'data encoder',
+        'typing clerk', 'typist', 'data capture', 'data verification', 'records clerk'
+    ],
+    'sales & marketing': [
+        'sales', 'sales representative', 'sales rep', 'sales executive', 'sales consultant', 'sales agent',
+        'marketing', 'marketing executive', 'marketing officer', 'marketing manager', 'digital marketing',
+        'business development', 'bdm', 'account manager', 'brand manager', 'growth manager', 'promoter',
+        'field sales', 'telesales', 'customer acquisition'
+    ],
+    'delivery & logistics': [
+        'delivery', 'delivery driver', 'bike rider', 'logistics', 'logistics officer', 'logistics coordinator',
+        'transport', 'transport officer', 'courier', 'dispatch', 'driver', 'truck driver', 'shipping',
+        'warehouse', 'warehouse assistant', 'storekeeper', 'supply chain', 'inventory', 'distribution'
+    ],
+    'customer service': [
+        'customer service', 'customer support', 'customer care', 'client service', 'client support',
+        'call center', 'call centre', 'contact centre', 'help desk', 'technical support', 'support agent',
+        'service representative', 'csr', 'customer success', 'customer experience'
+    ],
+    'finance & accounting': [
+        'finance', 'financial analyst', 'financial controller', 'finance manager', 'accounting',
+        'accountant', 'accounts assistant', 'accounts payable', 'accounts receivable', 'bookkeeper',
+        'bookkeeping', 'audit', 'auditor', 'tax', 'payroll', 'credit control', 'treasury', 'cost accountant'
+    ],
+    'admin & office work': [
+        'administrator', 'admin', 'administrative', 'office administrator', 'office assistant',
+        'secretary', 'executive assistant', 'personal assistant', 'receptionist', 'office manager',
+        'clerk', 'office clerk', 'data clerk', 'office coordinator', 'front office', 'office support'
+    ],
+    'teaching / training': [
+        'teacher', 'teaching', 'tutor', 'instructor', 'educator', 'lecturer', 'trainer',
+        'training', 'facilitator', 'curriculum', 'curriculum developer', 'academic', 'professor',
+        'school', 'kindergarten', 'primary school', 'high school', 'education officer', 'coach'
+    ],
+    'internships / attachments': [
+        'internship', 'intern', 'attachment', 'industrial attachment', 'trainee', 'graduate trainee',
+        'graduate program', 'entry level', 'junior', 'apprentice', 'fellowship', 'student', 'summer intern'
+    ],
+    # Focus on software-specific keywords to avoid generic engineering roles
+    'software engineering': [
+        'software', 'software engineer', 'software developer', 'developer', 'programmer',
+        'full stack', 'backend', 'front end', 'mobile developer', 'web developer',
+        'python', 'java', 'javascript', 'react', 'node', 'django', 'flutter'
+    ]
 }
 
 def generate_job_id(title: str, link: str) -> str:
@@ -52,8 +88,12 @@ def matches_search_terms(title: str, interest: str) -> bool:
         
     search_terms = ENHANCED_SEARCH_TERMS.get(interest, [interest])
     title_lower = title.lower()
-    
-    return any(term.lower() in title_lower for term in search_terms)
+    import re
+    for term in search_terms:
+        pattern = rf"\b{re.escape(term.lower())}\b"
+        if re.search(pattern, title_lower):
+            return True
+    return False
 
 async def scrape_myjobmag_working(interest: str) -> List[Dict[str, Any]]:
     """Scrape MyJobMag with working selectors and proper category filtering"""
@@ -214,21 +254,13 @@ async def scrape_myjobmag_working(interest: str) -> List[Dict[str, Any]]:
                     logger.debug(f"Error processing link {i}: {str(e)}")
                     continue
             
-            # Prioritize category matches, use fallback if needed
-            if len(category_matched_jobs) >= 3:
+            # Only return jobs that matched the category keywords
+            if category_matched_jobs:
                 jobs = category_matched_jobs[:5]
-                logger.info(f"🎯 Using {len(jobs)} category-matched jobs for {interest}")
-            elif len(category_matched_jobs) > 0:
-                # Mix category matches with best fallback jobs
-                jobs = category_matched_jobs + fallback_jobs[:5-len(category_matched_jobs)]
-                logger.info(f"🎯 Using {len(category_matched_jobs)} matched + {len(jobs)-len(category_matched_jobs)} fallback jobs for {interest}")
+                logger.info(f"🎯 Returning {len(jobs)} category-matched jobs for {interest}")
             else:
-                # Use fallback jobs but mark them clearly
-                jobs = fallback_jobs[:5]
-                for job in jobs:
-                    job['title'] = f"[General] {job['title']}"
-                    job['source'] = f"MyJobMag (General - {interest} not found)"
-                logger.info(f"⚠️ No specific {interest} jobs found, using {len(jobs)} general jobs")
+                logger.info(f"⚠️ No jobs matched the specific keywords for {interest}")
+                jobs = []
             
             await browser.close()
             
