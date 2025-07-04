@@ -393,6 +393,77 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
         # Check if user exists
         user = db.get_user_by_phone(phone)
         
+        # Handle job request FIRST - prioritize explicit job commands (moved to top)
+        if message_lower in ['jobs', 'job', 'work']:
+            if not user:
+                return "❌ Please register first by sending *hi*"
+            
+            if not user.get('interest'):
+                return "❌ Please set your job interest first. Send *hi* to see options."
+            
+            if user['balance'] <= 0:
+                return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
+            
+            # Get and send job
+            from scraper import scrape_jobs
+            jobs = scrape_jobs(user['interest'])
+            
+            if not jobs:
+                return f"😔 No new *{user['interest']}* jobs available right now. We'll keep looking!"
+            
+            # Basic job filtering (AI disabled to preserve rate limits)
+            logger.info(f"📋 Basic filtering {len(jobs)} jobs for {user['interest']}")
+            
+            # Simple filtering - just check if job hasn't been sent
+            filtered_jobs = []
+            for job in jobs:
+                if not has_job_been_sent(phone, job['id']):
+                    filtered_jobs.append(job)
+            
+            jobs = filtered_jobs
+            
+            # Find first job that hasn't been sent
+            job_to_send = None
+            for job in jobs:
+                if not has_job_been_sent(phone, job['id']):
+                    job_to_send = job
+                    break
+            
+            # Check if we found a new job
+            if not job_to_send:
+                return f"🔍 All current *{user['interest']}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send *hi*)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
+            
+            # Deduct credit and send job
+            if db.deduct_credit(phone):
+                # Log the job as sent
+                db.log_job_sent(phone, job_to_send['id'], job_to_send['title'], job_to_send['link'])
+                
+                # Generate personalized message using AI
+                if AI_AVAILABLE:
+                    try:
+                        personalized_message = generate_personalized_message(job_to_send, user)
+                        return personalized_message
+                    except Exception as e:
+                        logger.error(f"Error generating personalized message: {str(e)}")
+                        # Fall back to standard message
+                
+                # Standard job message (fallback)
+                job_message = f"""🎯 *New {user['interest'].title()} Job Alert:*
+
+📋 *{job_to_send['title']}*
+🏢 Company: {job_to_send.get('company', 'Not specified')}
+📍 Location: {job_to_send.get('location', 'Kenya')}
+🔗 {job_to_send['link']}
+🌐 Source: {job_to_send.get('source', 'Job Board')}
+
+💰 Credit used: 1
+💳 Remaining: {user['balance'] - 1}
+
+Good luck! 🍀"""
+                return job_message
+            else:
+                return "❌ Error processing your request. Please try again."
+        
         # AI-powered career question detection (with rate limiting protection)
         if AI_AVAILABLE and is_career_question(message):
             logger.info(f"🤖 AI detected career question: {message}")
@@ -583,90 +654,32 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
             db.clear_old_job_records(phone, days_old=0)  # Clear all records
             return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\nSend *jobs* to get fresh job alerts."
         
+
+        
         # Smart job request detection - enhanced with natural language understanding
         is_job_request = False
         job_confidence = 0.0
         
-        # Check if this is a job request using smart detection
-        if SMART_JOB_DETECTION_AVAILABLE:
+        # Check if this is a job request using smart detection (excluding explicit commands handled above)
+        if SMART_JOB_DETECTION_AVAILABLE and message_lower not in ['jobs', 'job', 'work']:
             is_job_request, job_confidence, detection_reason = detect_job_request(message)
             if is_job_request:
                 logger.info(f"🧠 Smart detection identified job request: {message[:50]} "
                            f"(confidence: {job_confidence:.2f}, reason: {detection_reason})")
-        else:
-            # Fallback to simple keyword detection
-            is_job_request = message_lower in ['jobs', 'job', 'work']
         
-        # Handle job request with AI enhancement
-        if is_job_request:
+        # Handle smart-detected job requests (but not explicit commands)
+        if is_job_request and message_lower not in ['jobs', 'job', 'work']:
             if not user:
-                return "❌ Please register first by sending *hi*"
+                return f"🔍 I detected you're looking for jobs! To get started:\n\n1. Send *hi* to register\n2. Choose your job interest\n3. Add credits (1-30)\n4. Start receiving job alerts!\n\n💡 *Try*: Send *hi* to begin"
             
             if not user.get('interest'):
-                return "❌ Please set your job interest first. Send *hi* to see options."
+                return f"🔍 I detected you're looking for jobs! Please set your job interest first. Send *hi* to see options."
             
             if user['balance'] <= 0:
-                return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
+                return f"🔍 I detected you're looking for jobs! You need credits first.\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
             
-            # Get and send job
-            from scraper import scrape_jobs
-            jobs = scrape_jobs(user['interest'])
-            
-            if not jobs:
-                return f"😔 No new *{user['interest']}* jobs available right now. We'll keep looking!"
-            
-            # Basic job filtering (AI disabled to preserve rate limits)
-            logger.info(f"📋 Basic filtering {len(jobs)} jobs for {user['interest']}")
-            
-            # Simple filtering - just check if job hasn't been sent
-            filtered_jobs = []
-            for job in jobs:
-                if not has_job_been_sent(phone, job['id']):
-                    filtered_jobs.append(job)
-            
-            jobs = filtered_jobs
-            
-            # Find first job that hasn't been sent
-            job_to_send = None
-            for job in jobs:
-                if not has_job_been_sent(phone, job['id']):
-                    job_to_send = job
-                    break
-            
-            # Check if we found a new job
-            if not job_to_send:
-                return f"🔍 All current *{user['interest']}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send *hi*)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
-            
-            # Deduct credit and send job
-            if db.deduct_credit(phone):
-                # Log the job as sent
-                db.log_job_sent(phone, job_to_send['id'], job_to_send['title'], job_to_send['link'])
-                
-                # Generate personalized message using AI
-                if AI_AVAILABLE:
-                    try:
-                        personalized_message = generate_personalized_message(job_to_send, user)
-                        return personalized_message
-                    except Exception as e:
-                        logger.error(f"Error generating personalized message: {str(e)}")
-                        # Fall back to standard message
-                
-                # Standard job message (fallback)
-                job_message = f"""🎯 *New {user['interest'].title()} Job Alert:*
-
-📋 *{job_to_send['title']}*
-🏢 Company: {job_to_send.get('company', 'Not specified')}
-📍 Location: {job_to_send.get('location', 'Kenya')}
-🔗 {job_to_send['link']}
-🌐 Source: {job_to_send.get('source', 'Job Board')}
-
-💰 Credit used: 1
-💳 Remaining: {user['balance'] - 1}
-
-Good luck! 🍀"""
-                return job_message
-            else:
-                return "❌ Error processing your request. Please try again."
+            # For smart-detected requests, redirect to explicit command
+            return f"🔍 I detected you're looking for jobs! Send *jobs* to get your job alerts."
         
         # AI-powered default response
         if AI_AVAILABLE:

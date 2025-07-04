@@ -569,28 +569,14 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
                 logger.error(f"Error clearing job records: {e}")
                 return "❌ Error refreshing job history. Please try again."
         
-        # Smart job request detection - enhanced with natural language understanding
-        is_job_request = False
-        job_confidence = 0.0
-        
-        # Check if this is a job request using smart detection
-        if SMART_JOB_DETECTION_AVAILABLE:
-            is_job_request, job_confidence, detection_reason = detect_job_request(message)
-            if is_job_request:
-                logger.info(f"🧠 Smart detection identified job request: {message[:50]} "
-                           f"(confidence: {job_confidence:.2f}, reason: {detection_reason})")
-        else:
-            # Fallback to simple keyword detection
-            is_job_request = message_lower in ['jobs', 'job', 'work', '/jobs']
-        
-        # Handle job request with AI enhancement
-        if is_job_request:
+        # Handle job request FIRST - prioritize explicit job commands
+        if message_lower in ['jobs', 'job', 'work', '/jobs']:
             if not user:
-                return "❌ Please register first by sending *hi*"
+                return "❌ Please register first by sending /start"
             
             user_interests = user.get('interests', [])
             if not user_interests:
-                return "❌ Please set your job interest first. Send *hi* to see options."
+                return "❌ Please set your job interest first. Send /start to see options."
             
             if user.get('balance', 0) <= 0:
                 return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
@@ -622,7 +608,7 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             
             # Check if we found a new job
             if not job_to_send:
-                return f"🔍 All current *{interest}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send *hi*)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
+                return f"🔍 All current *{interest}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send /start)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
             
             # Deduct credit and send job
             try:
@@ -658,6 +644,32 @@ Good luck! 🍀"""
             except Exception as e:
                 logger.error(f"Error processing job request: {e}")
                 return "❌ Error processing your request. Please try again."
+        
+        # Smart job request detection - enhanced with natural language understanding
+        is_job_request = False
+        job_confidence = 0.0
+        
+        # Check if this is a job request using smart detection (excluding explicit commands handled above)
+        if SMART_JOB_DETECTION_AVAILABLE and message_lower not in ['jobs', 'job', 'work', '/jobs']:
+            is_job_request, job_confidence, detection_reason = detect_job_request(message)
+            if is_job_request:
+                logger.info(f"🧠 Smart detection identified job request: {message[:50]} "
+                           f"(confidence: {job_confidence:.2f}, reason: {detection_reason})")
+        
+        # Handle smart-detected job requests (but not explicit commands)
+        if is_job_request and message_lower not in ['jobs', 'job', 'work', '/jobs']:
+            if not user:
+                return f"🔍 I detected you're looking for jobs! To get started:\n\n1. Send /start to register\n2. Choose your job interest\n3. Add credits (1-30)\n4. Start receiving job alerts!\n\n💡 *Try*: Send /start to begin"
+            
+            user_interests = user.get('interests', [])
+            if not user_interests:
+                return f"🔍 I detected you're looking for jobs! Please set your job interest first. Send /start to see options."
+            
+            if user.get('balance', 0) <= 0:
+                return f"🔍 I detected you're looking for jobs! You need credits first.\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
+            
+            # For smart-detected requests, redirect to explicit command
+            return f"🔍 I detected you're looking for jobs! Send *jobs* or /jobs to get your job alerts."
         
         # Final check for job requests before AI default response
         if SMART_JOB_DETECTION_AVAILABLE and is_smart_job_request(message, threshold=0.3):
