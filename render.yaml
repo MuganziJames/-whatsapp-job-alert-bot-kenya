@@ -20,7 +20,7 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
-    startCommand: python telegram_bot.py
+    startCommand: python telegram_simple.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0

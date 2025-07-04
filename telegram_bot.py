@@ -585,10 +585,11 @@ def main() -> None:
 
 def run_web_server():
     """Run a simple web server for Render deployment"""
-    from flask import Flask, jsonify
     import threading
     import os
+    from flask import Flask, jsonify
     
+    # Create Flask app
     flask_app = Flask(__name__)
     
     @flask_app.route('/')
@@ -610,17 +611,27 @@ def run_web_server():
     
     # Start Telegram bot in a separate thread
     def start_telegram_bot():
-        main()
+        try:
+            main()
+        except Exception as e:
+            logger.error(f"Telegram bot error: {e}")
     
+    # Start the Telegram bot
     telegram_thread = threading.Thread(target=start_telegram_bot, daemon=True)
     telegram_thread.start()
     
     # Start Flask web server
     port = int(os.getenv('PORT', 10001))
     logger.info(f"Starting Telegram bot web server on port {port}")
-    flask_app.run(host='0.0.0.0', port=port, debug=False)
+    
+    try:
+        flask_app.run(host='0.0.0.0', port=port, debug=False)
+    except Exception as e:
+        logger.error(f"Flask server error: {e}")
+        raise
 
 if __name__ == "__main__":
+    import os
     # Check if we're running on Render (has PORT env var)
     if os.getenv('PORT'):
         run_web_server()
