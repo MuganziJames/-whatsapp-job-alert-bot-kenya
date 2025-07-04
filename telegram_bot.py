@@ -348,6 +348,85 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             logger.error(f"Error getting user: {e}")
             return "❌ System error: Unable to retrieve user information. Please try again later."
         
+        # Handle job request FIRST - prioritize explicit job commands (moved to top)
+        if message_lower in ['jobs', 'job', 'work', '/jobs']:
+            if not user:
+                return "❌ Please register first by sending /start"
+            
+            user_interests = user.get('interests', [])
+            if not user_interests:
+                return "❌ Please set your job interest first. Send /start to see options."
+            
+            if user.get('balance', 0) <= 0:
+                return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
+            
+            # Get and send job
+            interest = user_interests[0]  # Use first interest
+            from scraper import scrape_jobs
+            jobs = scrape_jobs(interest)
+            
+            if not jobs:
+                return f"😔 No new *{interest}* jobs available right now. We'll keep looking!"
+            
+            # Basic job filtering (AI disabled to preserve rate limits)
+            logger.info(f"📋 Basic filtering {len(jobs)} jobs for {interest}")
+            
+            # Simple filtering - just check if job hasn't been sent
+            filtered_jobs = []
+            for job in jobs:
+                if not has_job_been_sent(user_id, job['id']):
+                    filtered_jobs.append(job)
+            
+            jobs = filtered_jobs
+            
+            # Find first job that hasn't been sent
+            job_to_send = None
+            for job in jobs:
+                if not has_job_been_sent(user_id, job['id']):
+                    job_to_send = job
+                    break
+            
+            # Check if we found a new job
+            if not job_to_send:
+                return f"🔍 All current *{interest}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send /start)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
+            
+            # Deduct credit and send job
+            try:
+                if db.deduct_credit(user_id):
+                    # Log the job as sent
+                    db.log_job_sent(user_id, job_to_send['id'], job_to_send['title'], job_to_send['link'])
+                    
+                    # Generate personalized message using AI
+                    if AI_AVAILABLE:
+                        try:
+                            personalized_message = generate_personalized_message(job_to_send, user)
+                            return personalized_message
+                        except Exception as e:
+                            logger.error(f"Error generating personalized message: {str(e)}")
+                            # Fall back to standard message
+                    
+                    # Standard job message (fallback)
+                    job_message = f"""🎯 *New {interest.title()} Job Alert:*
+
+📋 *{job_to_send['title']}*
+🏢 Company: {job_to_send.get('company', 'Not specified')}
+📍 Location: {job_to_send.get('location', 'Kenya')}
+🔗 {job_to_send['link']}
+🌐 Source: {job_to_send.get('source', 'Job Board')}
+
+💰 Credit used: 1
+💳 Remaining: {user.get('balance', 0) - 1}
+
+Good luck! 🍀
+
+💡 *Want more jobs?* Type *jobs* or /jobs anytime to get another job alert!"""
+                    return job_message
+                else:
+                    return "❌ Error processing your request. Please try again."
+            except Exception as e:
+                logger.error(f"Error processing job request: {e}")
+                return "❌ Error processing your request. Please try again."
+        
         # AI-powered career question detection (with rate limiting protection)
         # Skip AI for simple greetings to avoid rate limiting issues
         simple_greetings = ['hi', 'hello', 'hey', 'hey hi', 'hello hi', 'hi there', 'hey there', 'start', 'help']
@@ -534,7 +613,7 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
                         current_balance = user.get('balance', 0)
                         new_balance = current_balance + credit_amount
                         interest = user_interests[0] if user_interests else "Not set"
-                        return f"✅ *Credits Added Successfully!*\n\n💰 Added: *{credit_amount}* credits\n💳 Total Balance: *{new_balance}* credits\n🎯 Job Interest: *{interest}*\n\nSend *jobs* to start receiving job alerts!"
+                        return f"✅ *Credits Added Successfully!*\n\n💰 Added: *{credit_amount}* credits\n💳 Total Balance: *{new_balance}* credits\n🎯 Job Interest: *{interest}*\n\n💡 Type *jobs* or /jobs anytime to get job alerts!"
                     else:
                         return "❌ Error adding credits. Please try again."
                 except Exception as e:
@@ -550,7 +629,7 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
                 interest_text = interests[0] if interests else 'Not set'
                 balance = user.get('balance', 0)
                 if balance > 0:
-                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{interest_text}*\n\nSend *jobs* to get job alerts!"
+                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{interest_text}*\n\n💡 Type *jobs* or /jobs anytime to get job alerts!"
                 else:
                     return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{interest_text}*\n\nSend a number (1-30) to add more credits!"
             else:
@@ -564,86 +643,12 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             # Clear old job records
             try:
                 db.clear_old_job_records(user_id, days_old=0)  # Clear all records
-                return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\nSend *jobs* to get fresh job alerts."
+                return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\n💡 Type *jobs* or /jobs anytime to get fresh job alerts."
             except Exception as e:
                 logger.error(f"Error clearing job records: {e}")
                 return "❌ Error refreshing job history. Please try again."
         
-        # Handle job request FIRST - prioritize explicit job commands
-        if message_lower in ['jobs', 'job', 'work', '/jobs']:
-            if not user:
-                return "❌ Please register first by sending /start"
-            
-            user_interests = user.get('interests', [])
-            if not user_interests:
-                return "❌ Please set your job interest first. Send /start to see options."
-            
-            if user.get('balance', 0) <= 0:
-                return f"❌ No credits available!\n\n💰 *Add credits:*\nSend a number from *1 to 30* to get that many credits.\n\nExample: Send *5* to get 5 credits"
-            
-            # Get and send job
-            interest = user_interests[0]  # Use first interest
-            jobs = scrape_jobs(interest)
-            
-            if not jobs:
-                return f"😔 No new *{interest}* jobs available right now. We'll keep looking!"
-            
-            # Basic job filtering (AI disabled to preserve rate limits)
-            logger.info(f"📋 Basic filtering {len(jobs)} jobs for {interest}")
-            
-            # Simple filtering - just check if job hasn't been sent
-            filtered_jobs = []
-            for job in jobs:
-                if not has_job_been_sent(user_id, job['id']):
-                    filtered_jobs.append(job)
-            
-            jobs = filtered_jobs
-            
-            # Find first job that hasn't been sent
-            job_to_send = None
-            for job in jobs:
-                if not has_job_been_sent(user_id, job['id']):
-                    job_to_send = job
-                    break
-            
-            # Check if we found a new job
-            if not job_to_send:
-                return f"🔍 All current *{interest}* jobs have been sent to you!\n\n💡 *What you can do:*\n• Try a different job category (send /start)\n• Send *refresh* to reset your job history\n• Check back in a few hours for new jobs\n• Send *balance* to see your credits\n\n🔄 New jobs are added regularly!"
-            
-            # Deduct credit and send job
-            try:
-                if db.deduct_credit(user_id):
-                    # Log the job as sent
-                    db.log_job_sent(user_id, job_to_send['id'], job_to_send['title'], job_to_send['link'])
-                    
-                    # Generate personalized message using AI
-                    if AI_AVAILABLE:
-                        try:
-                            personalized_message = generate_personalized_message(job_to_send, user)
-                            return personalized_message
-                        except Exception as e:
-                            logger.error(f"Error generating personalized message: {str(e)}")
-                            # Fall back to standard message
-                    
-                    # Standard job message (fallback)
-                    job_message = f"""🎯 *New {interest.title()} Job Alert:*
 
-📋 *{job_to_send['title']}*
-🏢 Company: {job_to_send.get('company', 'Not specified')}
-📍 Location: {job_to_send.get('location', 'Kenya')}
-🔗 {job_to_send['link']}
-🌐 Source: {job_to_send.get('source', 'Job Board')}
-
-💰 Credit used: 1
-💳 Remaining: {user.get('balance', 0) - 1}
-
-Good luck! 🍀"""
-                    return job_message
-                else:
-                    return "❌ Error processing your request. Please try again."
-            except Exception as e:
-                logger.error(f"Error processing job request: {e}")
-                return "❌ Error processing your request. Please try again."
         
         # Smart job request detection - enhanced with natural language understanding
         is_job_request = False

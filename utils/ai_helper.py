@@ -613,7 +613,8 @@ Create an engaging message that:
 2. Includes key job details
 3. Encourages them to apply
 4. Mentions credit usage
-5. Keeps it under 200 words for WhatsApp
+5. Ends with "💡 *Want more jobs?* Type *jobs* anytime to get another job alert!"
+6. Keeps it under 200 words for WhatsApp
 
 Use emojis and formatting for better readability."""
         
@@ -638,7 +639,9 @@ Use emojis and formatting for better readability."""
 
 💳 1 credit used | Balance: {user_info.get('balance', 0) - 1}
 
-Good luck with your application! 🚀"""
+Good luck with your application! 🚀
+
+💡 *Want more jobs?* Type *jobs* anytime to get another job alert!"""
 
 def get_career_advice(question: str, user_context: Dict[str, Any] = None) -> str:
     """Get career advice from AI"""

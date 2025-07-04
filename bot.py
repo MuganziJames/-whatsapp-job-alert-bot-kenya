@@ -459,7 +459,9 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
 💰 Credit used: 1
 💳 Remaining: {user['balance'] - 1}
 
-Good luck! 🍀"""
+Good luck! 🍀
+
+💡 *Want more jobs?* Type *jobs* anytime to get another job alert!"""
                 return job_message
             else:
                 return "❌ Error processing your request. Please try again."
@@ -628,7 +630,7 @@ Good luck! 🍀"""
                 
                 if success:
                     new_balance = user['balance'] + credit_amount
-                    return f"✅ *Credits Added Successfully!*\n\n💰 Added: *{credit_amount}* credits\n💳 Total Balance: *{new_balance}* credits\n🎯 Job Interest: *{user['interest']}*\n\nSend *jobs* to start receiving job alerts!"
+                    return f"✅ *Credits Added Successfully!*\n\n💰 Added: *{credit_amount}* credits\n💳 Total Balance: *{new_balance}* credits\n🎯 Job Interest: *{user['interest']}*\n\n💡 Type *jobs* anytime to get job alerts!"
                 else:
                     return "❌ Error adding credits. Please try again."
             else:
@@ -639,7 +641,7 @@ Good luck! 🍀"""
             if user:
                 balance = user.get('balance', 0)
                 if balance > 0:
-                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend *jobs* to get job alerts!"
+                    return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\n💡 Type *jobs* anytime to get job alerts!"
                 else:
                     return f"💳 *Account Balance:*\nCredits: *{balance}*\nJob Interest: *{user.get('interest', 'Not set')}*\n\nSend a number (1-30) to add more credits!"
             else:
@@ -652,7 +654,7 @@ Good luck! 🍀"""
             
             # Clear old job records
             db.clear_old_job_records(phone, days_old=0)  # Clear all records
-            return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\nSend *jobs* to get fresh job alerts."
+            return f"🔄 *Job history refreshed!*\n\nAll previous job records cleared. You can now receive jobs again!\n\n💡 Type *jobs* anytime to get fresh job alerts."
         
 
         
