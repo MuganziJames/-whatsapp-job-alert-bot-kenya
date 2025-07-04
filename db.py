@@ -207,13 +207,19 @@ class DatabaseManager:
     def get_last_job_sent_time(self, phone: str) -> Optional[datetime]:
         """Get the timestamp of the last job sent to user"""
         try:
-            response = self.supabase.table('jobs_sent').select('created_at').eq('phone', phone).order('created_at', desc=True).limit(1).execute()
+            # Try both created_at and sent_at columns for compatibility
+            response = self.supabase.table('jobs_sent').select('created_at, sent_at').eq('phone', phone).order('created_at', desc=True).limit(1).execute()
             
             if response.data and len(response.data) > 0:
-                # Parse the timestamp from Supabase
-                timestamp_str = response.data[0]['created_at']
-                # Convert to datetime object
-                return datetime.fromisoformat(timestamp_str.replace('Z', '+00:00')).replace(tzinfo=None)
+                row = response.data[0]
+                # Use sent_at if available, otherwise created_at
+                timestamp_str = row.get('sent_at') or row.get('created_at')
+                
+                if timestamp_str:
+                    # Convert to datetime object (handle both Z and +00:00 formats)
+                    if timestamp_str.endswith('Z'):
+                        timestamp_str = timestamp_str.replace('Z', '+00:00')
+                    return datetime.fromisoformat(timestamp_str).replace(tzinfo=None)
             
             return None
         except Exception as e:

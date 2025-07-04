@@ -1,7 +1,7 @@
 """
 Smart Job scheduler for automatic job alerts
-- Sends job alerts every 2 minutes until 5 jobs are sent per user
-- Then switches to 2-4 hour intervals for subsequent alerts
+- Sends job alerts every 5 minutes until 5 jobs are sent per user
+- Then switches to 2-3 hour intervals for subsequent alerts
 """
 
 import time
@@ -52,39 +52,46 @@ class SmartJobScheduler:
         job_count = self.get_user_job_count_today(phone)
         
         if job_count < 5:
-            # First 5 jobs: every 2 minutes
-            return 2
+            # First 5 jobs: every 5 minutes
+            return 5
         else:
-            # After 5 jobs: random interval between 2-4 hours (120-240 minutes)
-            return random.randint(120, 240)
+            # After 5 jobs: random interval between 2-3 hours (120-180 minutes)
+            return random.randint(120, 180)
     
     def should_send_alert_to_user(self, phone: str) -> bool:
         """Check if we should send alert to this user based on timing"""
-        from db import db
-        
-        # Get user's last job sent time
-        last_job_time = db.get_last_job_sent_time(phone)
-        
-        if not last_job_time:
-            # No jobs sent yet, can send
+        try:
+            from db import db
+            
+            # Get user's last job sent time
+            last_job_time = db.get_last_job_sent_time(phone)
+            
+            if not last_job_time:
+                # No jobs sent yet, can send
+                logger.info(f"📅 User {phone}: No previous jobs sent - SENDING FIRST JOB")
+                return True
+            
+            # Calculate time since last job
+            time_since_last = datetime.now() - last_job_time
+            minutes_since_last = time_since_last.total_seconds() / 60
+            
+            # Get required interval
+            required_interval = self.get_next_alert_interval(phone)
+            
+            # Check if enough time has passed
+            should_send = minutes_since_last >= required_interval
+            
+            if should_send:
+                logger.info(f"📅 User {phone}: {minutes_since_last:.1f} min since last job (required: {required_interval} min) - SENDING")
+            else:
+                logger.info(f"⏰ User {phone}: {minutes_since_last:.1f} min since last job (required: {required_interval} min) - WAITING")
+            
+            return should_send
+            
+        except Exception as e:
+            logger.error(f"Error checking timing for {phone}: {str(e)}")
+            # If there's an error, allow sending (fail-safe)
             return True
-        
-        # Calculate time since last job
-        time_since_last = datetime.now() - last_job_time
-        minutes_since_last = time_since_last.total_seconds() / 60
-        
-        # Get required interval
-        required_interval = self.get_next_alert_interval(phone)
-        
-        # Check if enough time has passed
-        should_send = minutes_since_last >= required_interval
-        
-        if should_send:
-            logger.info(f"📅 User {phone}: {minutes_since_last:.1f} min since last job (required: {required_interval} min) - SENDING")
-        else:
-            logger.info(f"⏰ User {phone}: {minutes_since_last:.1f} min since last job (required: {required_interval} min) - WAITING")
-        
-        return should_send
     
     def start(self):
         """Start the smart job scheduler"""
@@ -223,9 +230,9 @@ def send_smart_job_alerts():
                             if current_count < 4:  # Show timing info for first 5 jobs
                                 timing_info = f"\n⏰ Next alert in ~{next_interval} minutes"
                             elif current_count == 4:  # Last quick alert
-                                timing_info = f"\n⏰ Next alert in 2-4 hours"
+                                timing_info = f"\n⏰ Next alert in 2-3 hours"
                             else:
-                                timing_info = f"\n⏰ Next alert in 2-4 hours"
+                                timing_info = f"\n⏰ Next alert in 2-3 hours"
                             
                             message = f"""🔔 *Smart Job Alert #{current_count + 1} - {interest.title()}*
 

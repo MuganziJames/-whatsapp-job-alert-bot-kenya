@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 
+# Start the job scheduler when the app is imported (not just when run directly)
+try:
+    start_job_scheduler()
+    logger.info("✅ Smart job scheduler started automatically")
+except Exception as e:
+    logger.error(f"❌ Failed to start scheduler: {e}")
+
 @app.route('/', methods=['GET', 'POST'])
 def home():
     """Health check endpoint"""

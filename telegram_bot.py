@@ -5,6 +5,7 @@ Matches WhatsApp bot functionality exactly
 
 import os
 import logging
+import re
 from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
@@ -83,46 +84,217 @@ What type of work are you looking for?
 • 'Help me choose a job category'
 • 'What skills do I need for [career]?'"""
 
-def normalize_category(user_input: str) -> str:
-    """Normalize user input to match valid categories - same as WhatsApp bot"""
+def smart_extract_job_category(user_input: str) -> str:
+    """
+    Smart extraction of job categories from natural language input
+    Handles phrases like "switch my interest to software engineering"
+    """
     user_input = user_input.strip().lower()
     
-    # Direct matches
-    if user_input in VALID_JOB_CATEGORIES:
-        return user_input
+    # Remove common filler words and phrases
+    filler_patterns = [
+        r'\b(switch|change|set|update|my|interest|to|for|in|i want|i need|looking for|search for|find|get)\b',
+        r'\b(job|jobs|work|career|position|role|roles)\b',
+        r'\b(please|can you|could you|would you|help me)\b'
+    ]
     
-    # Handle variations and shortcuts
+    cleaned_input = user_input
+    for pattern in filler_patterns:
+        cleaned_input = re.sub(pattern, ' ', cleaned_input)
+    
+    # Clean up extra spaces
+    cleaned_input = ' '.join(cleaned_input.split())
+    
+    # Try to match against our categories
+    return normalize_category(cleaned_input)
+
+def normalize_category(user_input: str) -> str:
+    """Enhanced normalize user input to match valid categories with better fuzzy matching"""
+    user_input = user_input.strip().lower()
+    
+    # Direct matches (case insensitive)
+    for category in VALID_JOB_CATEGORIES:
+        if user_input == category.lower():
+            return category
+    
+    # Handle exact phrase matches with flexible spacing and punctuation
+    category_variations = {
+        'data entry': ['data entry', 'data-entry', 'dataentry', 'data_entry'],
+        'sales & marketing': [
+            'sales & marketing', 'sales and marketing', 'sales marketing', 
+            'sales&marketing', 'sales_marketing', 'sales-marketing'
+        ],
+        'delivery & logistics': [
+            'delivery & logistics', 'delivery and logistics', 'delivery logistics',
+            'delivery&logistics', 'delivery_logistics', 'delivery-logistics'
+        ],
+        'customer service': [
+            'customer service', 'customer-service', 'customerservice', 'customer_service'
+        ],
+        'finance & accounting': [
+            'finance & accounting', 'finance and accounting', 'finance accounting',
+            'finance&accounting', 'finance_accounting', 'finance-accounting'
+        ],
+        'admin & office work': [
+            'admin & office work', 'admin and office work', 'admin office work',
+            'admin&office work', 'admin_office_work', 'admin-office-work',
+            'admin & office', 'admin office'
+        ],
+        'teaching / training': [
+            'teaching / training', 'teaching and training', 'teaching training',
+            'teaching/training', 'teaching_training', 'teaching-training',
+            'teaching / training', 'teaching/ training'  # Handle the exact case from screenshot
+        ],
+        'internships / attachments': [
+            'internships / attachments', 'internships and attachments', 'internships attachments',
+            'internships/attachments', 'internships_attachments', 'internships-attachments',
+            'internship / attachment', 'internship attachment'
+        ],
+        'software engineering': [
+            'software engineering', 'software-engineering', 'softwareengineering', 'software_engineering'
+        ]
+    }
+    
+    # Check variations
+    for category, variations in category_variations.items():
+        for variation in variations:
+            if user_input == variation.lower():
+                return category
+    
+    # Handle partial matches and shortcuts (but avoid confusion)
     category_mappings = {
+        # Data Entry
         'data': 'data entry',
         'entry': 'data entry',
+        
+        # Sales & Marketing  
         'sales': 'sales & marketing',
         'marketing': 'sales & marketing',
+        'business development': 'sales & marketing',
+        'sales rep': 'sales & marketing',
+        'sales representative': 'sales & marketing',
+        
+        # Delivery & Logistics
         'delivery': 'delivery & logistics',
         'logistics': 'delivery & logistics',
         'transport': 'delivery & logistics',
+        'transportation': 'delivery & logistics',
+        'courier': 'delivery & logistics',
+        'driver': 'delivery & logistics',
+        'warehouse': 'delivery & logistics',
+        
+        # Customer Service
         'customer': 'customer service',
         'service': 'customer service',
         'support': 'customer service',
+        'customer support': 'customer service',
+        'call center': 'customer service',
+        'helpdesk': 'customer service',
+        
+        # Finance & Accounting
         'finance': 'finance & accounting',
         'accounting': 'finance & accounting',
+        'bookkeeping': 'finance & accounting',
+        'accounts': 'finance & accounting',
+        'financial': 'finance & accounting',
+        
+        # Admin & Office Work
         'admin': 'admin & office work',
         'office': 'admin & office work',
+        'administrative': 'admin & office work',
+        'secretary': 'admin & office work',
+        'receptionist': 'admin & office work',
+        'clerk': 'admin & office work',
+        
+        # Teaching / Training
         'teaching': 'teaching / training',
         'training': 'teaching / training',
         'tutor': 'teaching / training',
         'teacher': 'teaching / training',
+        'education': 'teaching / training',
+        'instructor': 'teaching / training',
+        'lecturer': 'teaching / training',
+        
+        # Internships / Attachments
         'internship': 'internships / attachments',
         'attachment': 'internships / attachments',
         'intern': 'internships / attachments',
+        'trainee': 'internships / attachments',
+        'graduate program': 'internships / attachments',
+        
+        # Software Engineering
         'software': 'software engineering',
         'engineering': 'software engineering',
         'programming': 'software engineering',
         'developer': 'software engineering',
         'tech': 'software engineering',
-        'it': 'software engineering'
+        'it': 'software engineering',
+        'coding': 'software engineering',
+        'web development': 'software engineering',
+        'mobile development': 'software engineering',
+        'app development': 'software engineering',
+        'python': 'software engineering',
+        'javascript': 'software engineering',
+        'java': 'software engineering'
     }
     
-    return category_mappings.get(user_input, None)
+    # Avoid confusion with common greetings
+    if user_input in ['hi', 'hello', 'hey', 'start', 'help']:
+        return None
+    
+    # Check single word matches (be careful with short words)
+    if len(user_input) >= 3:  # Avoid very short words that might be confusing
+        for key, category in category_mappings.items():
+            if user_input == key.lower():
+                return category
+    
+    # Check if the input contains any of our keywords
+    for key, category in category_mappings.items():
+        if key in user_input and len(key) >= 4:  # Only match longer keywords within text
+            return category
+    
+    return None
+
+def detect_job_interest_from_message(message: str) -> str:
+    """
+    Detect job interest from natural language messages
+    Handles phrases like "switch my interest to software engineering"
+    """
+    message = message.strip().lower()
+    
+    # Common patterns for changing interests
+    interest_patterns = [
+        r'(?:switch|change|set|update).*?(?:interest|job|career).*?(?:to|for|in)\s+(.+)',
+        r'(?:i want|i need|looking for|search for|find|get)\s+(.+?)(?:\s+job|work|career|position|role)?',
+        r'(?:interested in|focus on|specialize in)\s+(.+)',
+        r'(?:my interest is|i am interested in)\s+(.+)'
+    ]
+    
+    for pattern in interest_patterns:
+        match = re.search(pattern, message)
+        if match:
+            potential_category = match.group(1).strip()
+            # Try smart extraction first
+            category = smart_extract_job_category(potential_category)
+            if category:
+                return category
+            # Fallback to normal normalization
+            category = normalize_category(potential_category)
+            if category:
+                return category
+    
+    # If no pattern matches, try direct category detection
+    return normalize_category(message)
+
+def is_interest_change_request(message: str) -> bool:
+    """Check if message is requesting to change job interest"""
+    message = message.lower()
+    change_indicators = [
+        'switch', 'change', 'set', 'update', 'my interest', 'i want', 'i need',
+        'looking for', 'search for', 'interested in', 'focus on', 'specialize in'
+    ]
+    
+    return any(indicator in message for indicator in change_indicators)
 
 def is_valid_category(user_input: str) -> bool:
     """Check if user input is a valid job category"""
@@ -231,10 +403,21 @@ def process_telegram_message(user_id: str, username: str, message_body: str) -> 
             # Enhanced greeting for new users (menu already includes AI help text)
             return base_menu
         
-        # Handle job interests with AI validation
-        if is_valid_category(message_lower):
-            # Normalize the category
-            normalized_category = normalize_category(message_lower)
+        # Smart job interest detection - handles natural language and case sensitivity
+        detected_category = None
+        
+        # First, try to detect if this is an interest change request
+        if is_interest_change_request(message):
+            detected_category = detect_job_interest_from_message(message)
+        
+        # If not an explicit change request, try direct category detection
+        if not detected_category:
+            detected_category = normalize_category(message_lower)
+        
+        # Handle job interests with smart detection
+        if detected_category:
+            # Use the detected category
+            normalized_category = detected_category
             
             # Save user interest
             if user:
