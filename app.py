@@ -47,10 +47,23 @@ def home():
 def health_check():
     """Detailed health check endpoint for monitoring"""
     try:
-        from db import db
+        # Check required environment variables
+        required_vars = ['SUPABASE_URL', 'SUPABASE_KEY']
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
         
-        # Test database connection
-        db.get_connection()
+        if missing_vars:
+            return jsonify({
+                'status': 'unhealthy',
+                'service': 'Ajirawise - Smart Job Alert Bot',
+                'version': '2.0.0',
+                'database': 'disconnected',
+                'error': f'Missing environment variables: {", ".join(missing_vars)}',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+        
+        # Test database connection by attempting a simple query
+        from db import db
+        test_user = db.get_user_by_phone("+254700000000")  # Test query
         
         return jsonify({
             'status': 'healthy',
@@ -120,14 +133,16 @@ def test_endpoint():
             'status': 'ok',
             'database': 'connected',
             'test_user': user,
-            'system': 'Credit Selection System (M-Pesa Removed)'
+            'system': 'Credit Selection System (M-Pesa Removed)',
+            'timestamp': datetime.now().isoformat()
         })
         
     except Exception as e:
         logger.error(f"Test endpoint error: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': str(e)
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
         }), 500
 
 @app.route('/admin/broadcast', methods=['POST'])
