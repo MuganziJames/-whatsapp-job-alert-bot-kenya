@@ -63,7 +63,7 @@ VALID_JOB_CATEGORIES = [
 
 def get_categories_menu() -> str:
     """Get formatted categories menu - same as WhatsApp bot"""
-    return """🔍 *Welcome to Kenya Job Alert Bot!*
+    return """🔍 *Welcome to Ajirawise - Your Smart Job Assistant!*
 
 Please reply with your job interest:
 • *Data Entry* - Data input and processing jobs
@@ -558,7 +558,7 @@ def main() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        logger.info("Starting Telegram Job Alert Bot …")
+        logger.info("Starting Ajirawise Telegram Bot …")
         app = Application.builder().token(TELEGRAM_TOKEN).build()
     
         # Commands

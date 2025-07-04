@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple startup script for WhatsApp Job Alert Bot
+Simple startup script for Ajirawise - Smart Job Alert Bot
 This provides an alternative way to run the application
 """
 
@@ -18,10 +18,10 @@ if __name__ == '__main__':
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     host = os.getenv('HOST', '0.0.0.0')
     
-    print("🚀 Starting WhatsApp Job Alert Bot...")
+    print("🚀 Starting Ajirawise - Smart Job Alert Bot...")
     print(f"📍 Running on http://{host}:{port}")
     print(f"🔧 Debug mode: {debug}")
-    print("💡 Send 'Hi' to your WhatsApp bot to get started!")
+    print("💡 Send 'Hi' to your Ajirawise bot to get started!")
     
     # Start the smart job scheduler
     print("🧠 Starting smart job scheduler...")

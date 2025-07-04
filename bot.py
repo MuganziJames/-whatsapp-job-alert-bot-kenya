@@ -67,7 +67,7 @@ except ImportError as e:
 
 def get_categories_menu() -> str:
     """Get formatted categories menu for welcome message"""
-    return """🔍 *Welcome to Kenya Job Alert Bot!*
+    return """🔍 *Welcome to Ajirawise - Your Smart Job Assistant!*
 
 Please reply with your job interest:
 • *Data Entry* - Data input and processing jobs

@@ -29,9 +29,37 @@ def home():
     """Health check endpoint"""
     return jsonify({
         'status': 'active',
-        'service': 'WhatsApp Job Alert Bot',
+        'service': 'Ajirawise - Smart Job Alert Bot',
         'version': '2.0.0 - Credit Selection System'
     })
+
+@app.route('/health')
+def health_check():
+    """Detailed health check endpoint for monitoring"""
+    try:
+        from db import db
+        
+        # Test database connection
+        db.get_connection()
+        
+        return jsonify({
+            'status': 'healthy',
+            'service': 'Ajirawise - Smart Job Alert Bot',
+            'version': '2.0.0',
+            'database': 'connected',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'service': 'Ajirawise - Smart Job Alert Bot',
+            'version': '2.0.0',
+            'database': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp_webhook():
@@ -275,7 +303,7 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
-    logger.info(f"Starting WhatsApp Job Alert Bot on port {port}")
+    logger.info(f"Starting Ajirawise - Smart Job Alert Bot on port {port}")
     logger.info("Job scheduler started - will run every 60 minutes")
     
     app.run(host='0.0.0.0', port=port, debug=debug_mode) 

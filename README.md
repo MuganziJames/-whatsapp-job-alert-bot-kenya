@@ -1,6 +1,6 @@
-# WhatsApp Job Alert Bot for Kenya 🇰🇪
+# 🚀 Ajirawise - Smart Job Alert Bot for Kenya 🇰🇪
 
-An intelligent WhatsApp bot that helps Kenyan job seekers find employment opportunities with AI-powered career assistance.
+An intelligent dual-platform bot (WhatsApp & Telegram) that helps Kenyan job seekers find employment opportunities with AI-powered career assistance.
 
 ## ✨ Features
 
@@ -23,7 +23,7 @@ An intelligent WhatsApp bot that helps Kenyan job seekers find employment opport
 
 ```
 You: hi
-Bot: 🔍 Welcome to Kenya Job Alert Bot! Choose your job interest...
+Bot: 🔍 Welcome to Ajirawise - Your Smart Job Assistant! Choose your job interest...
 
 You: software engineering
 Bot: 🎯 Great choice! Here are the latest software engineering jobs...
