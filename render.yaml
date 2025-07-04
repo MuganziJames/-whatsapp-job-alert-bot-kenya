@@ -4,29 +4,25 @@ services:
     name: ajirawise-whatsapp-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
+    buildCommand: pip install -r requirements.txt && playwright install chromium
     startCommand: python run.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /opt/render/project/.cache/ms-playwright
-      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
-        value: "1"
 
       # Telegram Bot Service (Web Service - Free Plan Compatible)
   - type: web
     name: ajirawise-telegram-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt && playwright install --with-deps chromium
+    buildCommand: pip install -r requirements.txt && playwright install chromium
     startCommand: python telegram_simple.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: PLAYWRIGHT_BROWSERS_PATH
         value: /opt/render/project/.cache/ms-playwright
-      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
-        value: "1"
       - key: PORT
         value: "10001"
