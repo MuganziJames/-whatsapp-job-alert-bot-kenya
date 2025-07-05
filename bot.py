@@ -438,14 +438,8 @@ def process_whatsapp_message(from_number: str, message_body: str) -> str:
                 # Log the job as sent
                 db.log_job_sent(phone, job_to_send['id'], job_to_send['title'], job_to_send['link'])
                 
-                # Generate personalized message using AI
-                if AI_AVAILABLE:
-                    try:
-                        personalized_message = generate_personalized_message(job_to_send, user)
-                        return personalized_message
-                    except Exception as e:
-                        logger.error(f"Error generating personalized message: {str(e)}")
-                        # Fall back to standard message
+                # Use standard job message without AI interference
+                logger.info(f"📋 Sending standard job message for {user['interest']}")
                 
                 # Standard job message (fallback)
                 job_message = f"""🎯 *New {user['interest'].title()} Job Alert:*

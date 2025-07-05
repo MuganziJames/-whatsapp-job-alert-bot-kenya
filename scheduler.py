@@ -216,15 +216,11 @@ def send_smart_job_alerts():
                         current_count = smart_scheduler.get_user_job_count_today(phone)
                         next_interval = smart_scheduler.get_next_alert_interval(phone)
                         
-                        # Generate personalized message using AI if available
-                        message = None
-                        if AI_AVAILABLE:
-                            try:
-                                message = generate_personalized_message(job, user)
-                            except Exception as e:
-                                logger.error(f"AI message generation error: {str(e)}")
+                        # Use standard job message without AI interference
+                        logger.info(f"📋 Sending standard job message for {interest}")
                         
-                        # Fallback to standard message if AI fails
+                        # Standard job message
+                        message = None
                         if not message:
                             timing_info = ""
                             if current_count < 4:  # Show timing info for first 5 jobs

@@ -324,12 +324,17 @@ def ask_deepseek(prompt: str, context: Dict[str, Any] = None) -> Dict[str, str]:
         reasoning = getattr(response.choices[0].message, 'reasoning_content', '')
         content = response.choices[0].message.content
         
+        # Check if content is empty or None
+        if not content or not content.strip():
+            logger.warning("AI generated empty response content, using fallback")
+            content = "I'm sorry, I couldn't generate a response. Please try again."
+        
         # Log the interaction for analytics
         logger.info(f"AI Query: {prompt[:50]}... | Response: {content[:50]}...")
         
         response_dict = {
             "reasoning": reasoning or "",
-            "content": content or "I'm sorry, I couldn't generate a response. Please try again."
+            "content": content
         }
         
         # Cache the response
@@ -535,12 +540,19 @@ Respond with:
 - red_flags: Any concerns about the job posting
 """
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.3
-        )
+        # Use the proper AI request function that handles retries and fallbacks
+        messages = [{"role": "user", "content": prompt}]
+        response = make_ai_request_with_retry(messages)
+        
+        # Check if response is valid and has content
+        if not response or not response.choices or not response.choices[0].message.content:
+            logger.warning("AI generated empty response for job matching, using defaults")
+            return {
+                "match_score": 50,
+                "quality_score": 50,
+                "analysis": "Unable to analyze job matching - AI response empty",
+                "should_send": True  # Default to sending if analysis fails
+            }
         
         content = response.choices[0].message.content
         
@@ -618,19 +630,24 @@ Create an engaging message that:
 
 Use emojis and formatting for better readability."""
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.7
-        )
+        # Use the proper AI request function that handles retries and fallbacks
+        messages = [{"role": "user", "content": prompt}]
+        response = make_ai_request_with_retry(messages)
         
-        return response.choices[0].message.content
+        # Check if response is valid and has content
+        if response and response.choices and response.choices[0].message.content:
+            ai_content = response.choices[0].message.content.strip()
+            if ai_content:  # Ensure content is not empty
+                return ai_content
+        
+        # If AI response is empty or invalid, fall back to standard message
+        logger.warning("AI generated empty response for personalized message, using fallback")
         
     except Exception as e:
         logger.error(f"Error generating personalized message: {str(e)}")
-        # Fallback to standard message
-        return f"""🎯 *New {user_info.get('interest', 'Job').title()} Alert!*
+    
+    # Fallback to standard message
+    return f"""🎯 *New {user_info.get('interest', 'Job').title()} Alert!*
 
 📋 *{job.get('title', 'Job Opportunity')}*
 🏢 {job.get('company', 'Company')}
@@ -663,18 +680,24 @@ Provide practical, actionable advice that:
 
 Focus on practical skills, networking, and realistic career paths."""
         
-        response = client.chat.completions.create(
-            model="deepseek/deepseek-r1:free",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.7
-        )
+        # Use the proper AI request function that handles retries and fallbacks
+        messages = [{"role": "user", "content": prompt}]
+        response = make_ai_request_with_retry(messages)
         
-        return response.choices[0].message.content
+        # Check if response is valid and has content
+        if response and response.choices and response.choices[0].message.content:
+            ai_content = response.choices[0].message.content.strip()
+            if ai_content:  # Ensure content is not empty
+                return ai_content
+        
+        # If AI response is empty or invalid, fall back to standard message
+        logger.warning("AI generated empty response for career advice, using fallback")
         
     except Exception as e:
         logger.error(f"Error getting career advice: {str(e)}")
-        return "I'd be happy to help with career advice! Could you be more specific about what you'd like to know? You can ask about job requirements, skills to develop, or career paths in any of our job categories."
+    
+    # Fallback message
+    return "I'd be happy to help with career advice! Could you be more specific about what you'd like to know? You can ask about job requirements, skills to develop, or career paths in any of our job categories."
 
 # Initialize AI helper
 def initialize_ai_helper():
